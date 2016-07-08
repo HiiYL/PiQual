@@ -22,6 +22,9 @@ ava_dataset = "dataset/AVA/data"
 root_path = os.getcwd()
 ava_data_path = os.path.join(root_path, ava_dataset)
 
+
+pd.read_table("AVA.txt", delim_whitespace=True)
+
 count = 10000#len(os.listdir(ava_data_path))
 images = np.empty(count, dtype=object)
 i=0
