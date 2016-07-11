@@ -5,9 +5,10 @@ import os
 import cPickle as pickle
 import pandas as pd
 
-
+import h5py
 
 from keras.layers import Dense, Activation
+from keras.regularizers import l2, activity_l2
 
 # ava_table = pd.read_table("dataset/AVA/AVA.txt", delim_whitespace=True)
 ava_table = pd.read_table("dataset/AVA/AVA.txt", delim_whitespace=True,
@@ -15,10 +16,10 @@ ava_table = pd.read_table("dataset/AVA/AVA.txt", delim_whitespace=True,
 ava_table.sort_index(inplace=True)
 X = pickle.load( open("images.p", "rb"))
 
-num_training = 8000
+num_training = 9000
 num_validation = 1000
 X_train = np.hstack(X).reshape(10000,-1).T #.transpose(0,2,3,1).astype("float")
-Y_train = ava_table.ix[:, 3:10].as_matrix()
+Y_train = ava_table.ix[:, 2:11].as_matrix()
 
 mask = range(num_training, num_training + num_validation)
 X_val = X_train[:,mask]
@@ -29,20 +30,22 @@ X_train = X_train[:,mask]
 Y_train = Y_train[mask]
 
 model = Sequential()
-
-model.add(Dense(32, input_shape=(12288,)))
+model.add(Dense(32, input_shape=(12288,), W_regularizer=l2(0.01)))
 model.add(Activation("relu"))
-model.add(Dense(output_dim=8))
-model.add(Activation("softmax"))
+model.add(Dropout(0.5))
+model.add(Dense(output_dim=10))
+model.add(Activation("linear"))
 
-model.compile(loss='categorical_crossentropy', optimizer='sgd', metrics=['accuracy'])
+model.compile(loss='mean_squared_error', optimizer='rmsprop', metrics=['accuracy'])
 
-model.fit(X_train.T, Y_train, nb_epoch=5, batch_size=32)
+model.fit(X_train.T, Y_train, nb_epoch=5, batch_size=16)
 
-score = model.evaluate(X_val.T, Y_val, batch_size=32)
+score = model.evaluate(X_val.T, Y_val, batch_size=16)
 
 print 
 print score
+
+model.save_weights('ava_simple.h5')
 
 
 images = np.array
