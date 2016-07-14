@@ -16,13 +16,13 @@ ava_table.sort_index(inplace=True)
 X = pickle.load( open("images_224.p", "rb"))
 
 num_training = 8000
-num_validation = 1000
+num_test = 1000
 X_train = np.hstack(X).reshape(10000,224,224,3)
 Y_train = ava_table.ix[:, 3:10].as_matrix()
 
-mask = range(num_training, num_training + num_validation)
-X_val = X_train[mask].transpose(1,2,3,0)
-Y_val = Y_train[mask]
+mask = range(num_training, num_training + num_test)
+X_test = X_train[mask].transpose(1,2,3,0)
+Y_test = Y_train[mask]
 
 mask = range(num_training)
 X_train = X_train[mask].transpose(1,2,3,0)
@@ -70,11 +70,11 @@ model.add(Dense(4096, activation='relu'))
 model.add(Dropout(0.5))
 model.add(Dense(4096, activation='relu'))
 model.add(Dropout(0.5))
-model.add(Dense(8, activation='softmax'))
+model.add(Dense(8, activation='linear'))
 
-model.compile(optimizer="sgd", loss='categorical_crossentropy')
-model.fit(X_train.T, Y_train, nb_epoch=5, batch_size=32)
-score = model.evaluate(X_val.T, Y_val, batch_size=32)
+model.compile(loss='mean_squared_error', optimizer='adam')
+model.fit(X_train.T, Y_train, nb_epoch=5, batch_size=32,validation_split=0.1)
+score = model.evaluate(X_test.T, Y_test, batch_size=32)
 
 print 
 print score
