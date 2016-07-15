@@ -32,7 +32,7 @@ model.add(Dense(32, input_shape=(12288,), activation='relu'))
 model.add(Dense(32, activation='relu'))
 model.add(Dense(output_dim=1))
 
-model.compile(loss='mean_squared_error', optimizer='adam')
+model.compile(loss='mean_squared_error', optimizer='rmsprop')
 
 model.fit(X_train.T, Y_train, nb_epoch=32, validation_split=0.1)
 
@@ -50,24 +50,7 @@ def image_to_pickle():
   filtered_ava = pd.read_pickle('filtered_ava.p')
 
   images = np.empty(count, dtype=object)
-  i=0
   print "Loading Images..."
-  # for root, dirnames, filenames in os.walk(ava_data_path):
-  #   for filename in sorted(filenames, key=lambda x: int(x.split('.')[0])):
-  #     if i >= count:
-  #       break
-  #     if (i % 1000) == 0:
-  #       print "Now processing " + str(i) + "/" + str(count)
-  #     image_index = int(filename.split(".jpg")[0])
-  #     try:
-  #       filtered_ava.iloc[[image_index]]
-  #       filepath = os.path.join(ava_data_path, filename)
-  #       image = ndimage.imread(filepath, mode="RGB")
-  #       image_resized = misc.imresize(image, (64, 64))
-  #       images[i] = image_resized
-  #     except KeyError:
-  #       print filename + " is missing or invalid."
-  #     i=i+1
   i=0
   count=10000
   invalid_indices = []
@@ -82,14 +65,17 @@ def image_to_pickle():
       image = ndimage.imread(filepath, mode="RGB")
       image_resized = misc.imresize(image, (64, 64))
       images[i] = image_resized
+      i=i+1
     except IOError:
       invalid_indices.append(index)
       print filename + " at position " + str(i) + "is missing or invalid."
-    i=i+1
+
+  filtered_ava['good'] = filtered_ava.apply(good, axis=1)
+  filtered_ava['bad'] = filtered_ava.apply(bad, axis=1)
+
   filtered_ava.drop(invalid_indices)
   filtered_ava.save_pickle('filtered_ava.p')
   pickle.dump(images, open("images.p", "wb"))
-
 
   # ava_images = pd.Series(images, index=filtered_ava.head(count).index)
   # filtered_ava['image'] = ava_images
@@ -124,3 +110,14 @@ def validate_table_against_images():
 
 
 
+def good(c):
+  if c['score'] >= 5:
+    return 1
+  else:
+    return 0
+
+def bad(c):
+  if c['score'] < 5:
+    return 1
+  else:
+    return 0

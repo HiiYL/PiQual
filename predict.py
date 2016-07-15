@@ -15,14 +15,23 @@ model.add(Dense(32, input_shape=(12288,), activation='relu'))
 model.add(Dense(32, activation='relu'))
 model.add(Dense(output_dim=1))
 
+
 model.load_weights('ava_simple.h5')
-model.compile(loss='mean_squared_error', optimizer='adam')
+model.compile(loss='mean_squared_error', optimizer='rmsprop')
 
 X = pickle.load( open("images.p", "rb"))
 
 print model.predict(X[0].reshape(1,12288))
+print model.predict(X[1].reshape(1,12288))
+print model.predict(X[2].reshape(1,12288))
+print model.predict(X[3].reshape(1,12288))
 
 filepath = os.path.join(os.getcwd(), "forest.jpg")
+image = ndimage.imread(filepath, mode="RGB")
+image_resized = misc.imresize(image, (64, 64))
+print model.predict(image_resized.reshape(1,12288))
+
+filepath = os.path.join(os.getcwd(), "test.jpg")
 image = ndimage.imread(filepath, mode="RGB")
 image_resized = misc.imresize(image, (64, 64))
 print model.predict(image_resized.reshape(1,12288))
