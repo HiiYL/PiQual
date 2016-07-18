@@ -53,7 +53,6 @@ model.add(Flatten())
 model.add(Dense(4096, activation='relu'))
 model.add(Dropout(0.5))
 model.add(Dense(4096, activation='relu'))
-model.add(Dropout(0.5))
 model.add(Dense(2, activation='softmax'))
 
 model.load_weights(weights_path)
@@ -70,9 +69,12 @@ model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy']
 filepath = os.path.join(os.getcwd(), "forest.jpg")
 image = ndimage.imread(filepath, mode="RGB")
 image_resized = misc.imresize(image, (224, 224))
-print model.predict(image_resized.reshape(1,224,224,3))
+print model.predict(image_resized.reshape(1,3,224,224))
+
+test = np.zeros(image_resized.reshape(1,3,224,224).shape)
+model.predict(test)
 
 filepath = os.path.join(os.getcwd(), "test.jpg")
 image = ndimage.imread(filepath, mode="RGB")
 image_resized = misc.imresize(image, (64, 64))
-print model.predict(image_resized.reshape(1,224,224,3))
+print model.predict(image_resized.reshape(1,3,224,224))
