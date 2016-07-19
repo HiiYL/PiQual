@@ -24,8 +24,8 @@ X = pickle.load( open("images.p", "rb"))
 num_training = 9000
 num_test = 1000
 X_train = np.hstack(X).reshape(10000,-1).T #.transpose(0,2,3,1).astype("float")
-Y_train = ava_table.ix[:, "score"].as_matrix()
-# Y_train = to_categorical(Y_train, 2)
+Y_train = ava_table.ix[:, "good"].as_matrix()
+Y_train = to_categorical(Y_train, 2)
 
 mask = range(num_training, num_training + num_test)
 X_test = X_train[:,mask]
@@ -51,11 +51,9 @@ model.add(Dense(32, activation='relu'))
 model.add(Dropout(0.5))
 model.add(Dense(32, activation='relu'))
 model.add(Dropout(0.5))
-model.add(Dense(32, activation='relu'))
-model.add(Dropout(0.5))
-model.add(Dense(1))
+model.add(Dense(2, activation='softmax'))
 
-model.compile(loss='mean_squared_error',
+model.compile(loss='categorical_crossentropy',
               optimizer='adam',
               metrics=['accuracy'])
 
@@ -66,6 +64,7 @@ score = model.evaluate(X_test.T, Y_test)
 print 
 print('Test score:', score[0])
 print('Test accuracy:', score[1])
+
 
 print model.predict(np.expand_dims(X_test.T[0], axis=0))
 print model.predict(np.expand_dims(X_test.T[1], axis=0))
