@@ -11,9 +11,13 @@ from keras.layers import Dense, Activation
 from keras.regularizers import l2, activity_l2
 
 model = Sequential()
-model.add(Dense(32, input_shape=(12288,), activation='relu'))
+model.add(Dense(64, input_dim=12288, activation='relu'))
+model.add(Dropout(0.5))
 model.add(Dense(32, activation='relu'))
-model.add(Dense(output_dim=1))
+model.add(Dropout(0.5))
+model.add(Dense(32, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(2, activation='softmax'))
 
 
 model.load_weights('ava_simple.h5')

@@ -172,47 +172,95 @@ print model.predict(np.expand_dims(image_resized.T, axis=0))
 def image_to_pickle():
   ava_path = "dataset/AVA/data/"
   ava_data_path = os.path.join(os.getcwd(), ava_path)
-  periodNum = len(os.listdir(ava_data_path))
+  store = HDFStore('labels.h5')
+  ava_table = store['labels']
+
+
   channel = 3
   width= 224
   height = 224
-  store = HDFStore('labels.h5')
-  filtered_ava = store['labels']
 
   h5f = h5py.File('images_224.h5', 'w')
 
+  print "Checking for invalid images ..."
+  invalid_indices = []
+  labels_count = ava_table.shape[0]
+  i = 0
+  for index, row in ava_table.iterrows():
+    if (i % 1000) == 0:
+      print "Now processing " + str(i) + "/" + str(labels_count)
+    filename = str(index) + ".jpg"
+    filepath = os.path.join(ava_data_path, filename)
+    if not os.path.isfile(filepath):
+      invalid_indices.append(index)
+      print filename + " at position " + str(i) + " is missing or invalid."
+    i = i + 1
+  if invalid_indices:
+    ava_table = ava_table.drop(invalid_indices)
+    store['labels'] = ava_table
+
+  periodNum = ava_table.shape[0]
   data = h5f.create_dataset("data", (periodNum,channel,width,height), dtype='uint8')
 
   print "Loading Images..."
 
   i=0
   invalid_indices = []
-  for index, row in filtered_ava.iterrows():
-    # if (i >= periodNum):
-    #   break
+  for index, row in ava_table.iterrows():
     if (i % 1000) == 0:
       print "Now processing " + str(i) + "/" + str(periodNum)
     filename = str(index) + ".jpg"
     filepath = os.path.join(ava_data_path, filename)
-    try:
-      image = ndimage.imread(filepath, mode="RGB")
-      image_resized = misc.imresize(image, (224, 224)).T
-      data[i] = np.expand_dims(image_resized,axis=0)
-      i=i+1
-    except IOError:
-      invalid_indices.append(index)
-      print filename + " at position " + str(i) + "is missing or invalid."
-
-  if invalid_indices:
-    try:
-      filtered_ava = filtered_ava.drop(invalid_indices)
-      del store['labels']
-      store['labels'] = filtered_ava
-    except ValueError:
-      print "UHOH THIS SHOULDNT HAVE HAPPENED IMAGE TO PICKLE"
+    image = ndimage.imread(filepath, mode="RGB")
+    image_resized = misc.imresize(image, (224, 224)).T
+    data[i] = np.expand_dims(image_resized,axis=0)
+    i=i+1
 
 
   h5f.close()
   store.close()
-  # filtered_ava.save_pickle('filtered_ava.p')
 
+def image_to_test():
+
+  ava_path = "dataset/AVA/data/"
+  ava_data_path = os.path.join(os.getcwd(), ava_path)
+
+  ava_table = pd.read_table("dataset/AVA/aesthetics_image_lists/generic_ls_train.jpgl", delim_whitespace=True,
+   header=None, index_col=0)
+
+
+  h5f = h5py.File('images_224.h5', 'w')
+  store = HDFStore('labels.h5')
+
+  invalid_indices = []
+  labels_count = ava_table.shape[0]
+  i = 0
+  for index, row in ava_table.iterrows():
+    if (i % 1000) == 0:
+      print "Now processing " + str(i) + "/" + str(labels_count)
+    filename = str(index) + ".jpg"
+    filepath = os.path.join(ava_data_path, filename)
+    if not os.path.isfile(filepath):
+      invalid_indices.append(index)
+      print filename + " at position " + str(i) + " is missing or invalid."
+    i = i + 1
+  if invalid_indices:
+    ava_table = ava_table.drop(invalid_indices)
+    store['labels_test'] = ava_table
+  store['labels_test'] = store['labels_test'].join(store['labels'])
+  imagesCount = ava_table.shape[0]
+  channel = 3
+  width= 224
+  height = 224
+  data = h5f.create_dataset("data_test", (imagesCount,channel,width,height), dtype='uint8')
+
+  i=0
+  for index, row in ava_table.iterrows():
+    if (i % 1000) == 0:
+      print "Now processing " + str(i) + "/" + str(imagesCount)
+    filename = str(index) + ".jpg"
+    filepath = os.path.join(ava_data_path, filename)
+    image = ndimage.imread(filepath, mode="RGB")
+    image_resized = misc.imresize(image, (224, 224)).T
+    data[i] = np.expand_dims(image_resized,axis=0)
+    i=i+1
