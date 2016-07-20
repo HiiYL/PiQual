@@ -11,6 +11,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Activation
 from keras.regularizers import l2, activity_l2
 from keras.utils.np_utils import to_categorical
+from keras.utils.io_utils import HDF5Matrix
 from keras.layers.core import Flatten, Dense, Dropout
 from keras.optimizers import SGD
 
