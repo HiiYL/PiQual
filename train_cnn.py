@@ -1,8 +1,6 @@
 from scipy import ndimage, misc
-import cv2
 import numpy as np
 import os
-import cPickle as pickle
 import pandas as pd
 from pandas import HDFStore, DataFrame
 
@@ -16,30 +14,42 @@ from keras.utils.np_utils import to_categorical
 from keras.preprocessing.image import ImageDataGenerator
 from keras.optimizers import SGD
 
-num_training = 229979
-num_test = 25549
+# num_training = 9000
+# num_test = 1000
+
+delta = 1.5
 
 store = HDFStore('labels.h5')
 # delta = 1
-ava_table = store['labels']
+ava_table = store['labels_train']
+ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
+
+ava_test = store['labels_test']
 # X_train = np.hstack(X).reshape(10000,224,224,3)
 # X = pickle.load( open("images_224.p", "rb"))
-h5f = h5py.File('images_224.h5','r')
+h5f = h5py.File('images_224_delta_1.5.h5','r')
+h5f_test = h5py.File('images_224.h5', 'r')
 # X = h5f['images'][:]
-X_train = h5f['data']
+X_train = h5f['data'][:]
+X_test = h5f_test['data_test']
 
-# X_train = X_train.astype('float32')
+X_train = X_train.astype('float32')
 
 Y_train = ava_table.ix[:, "good"].as_matrix()
 Y_train = to_categorical(Y_train, 2)
 
-mask = range(num_training, num_training + num_test)
-X_test = X_train[mask]
-Y_test = Y_train[mask]
+Y_test = ava_test.ix[:, "good"].as_matrix()
+Y_test = to_categorical(Y_test, 2)
 
-mask = range(num_training)
+
+
+# mask = range(num_training, num_training + num_test)
+# X_test = X_train[mask]
+# Y_test = Y_train[mask]
+
+# mask = range(num_training)
 # X_train = X_train[mask]
-Y_train = Y_train[mask]
+# Y_train = Y_train[mask]
 
 # ##TODO: REMOVE BAD BAD HACK
 # b = np.array([0,1])
@@ -47,12 +57,17 @@ Y_train = Y_train[mask]
 
 ####
 
-X_mean = np.mean(X_train)
-X_train -= X_mean
-X_train /= 255
 
-X_test -= np.mean(X_test)
-X_test /= 255
+
+# X_mean = np.mean(X_train)
+# X_train -= X_mean
+# X_train /= 255
+
+# X_test -= np.mean(X_test)
+# X_test /= 255
+
+h5f.close()
+store.close()
 
 weights_path = os.path.join(os.getcwd(), "vgg16_weights.h5")
 
@@ -103,37 +118,39 @@ model.add(Dense(1000, activation='softmax'))
 
 model.load_weights(weights_path)
 
+for layer in model.layers:
+  layer.trainable = False
+
 model.layers.pop()
-model.layers.pop()
-model.add(Dropout(0.5))
 model.add(Dense(output_dim=2, activation='softmax'))
 
-model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 
 
 
-datagen = ImageDataGenerator(
-        featurewise_center=True, # set input mean to 0 over the dataset
-        samplewise_center=False, # set each sample mean to 0
-        featurewise_std_normalization=True, # divide inputs by std of the dataset
-        samplewise_std_normalization=False, # divide each input by its std
-        zca_whitening=False, # apply ZCA whitening
-        rotation_range=20, # randomly rotate images in the range (degrees, 0 to 180)
-        width_shift_range=0.2, # randomly shift images horizontally (fraction of total width)
-        height_shift_range=0.2, # randomly shift images vertically (fraction of total height)
-        horizontal_flip=True, # randomly flip images
-        vertical_flip=False) # randomly flip images
+# datagen = ImageDataGenerator(
+#         featurewise_center=True, # set input mean to 0 over the dataset
+#         samplewise_center=False, # set each sample mean to 0
+#         featurewise_std_normalization=True, # divide inputs by std of the dataset
+#         samplewise_std_normalization=False, # divide each input by its std
+#         zca_whitening=False, # apply ZCA whitening
+#         rotation_range=20, # randomly rotate images in the range (degrees, 0 to 180)
+#         width_shift_range=0.2, # randomly shift images horizontally (fraction of total width)
+#         height_shift_range=0.2, # randomly shift images vertically (fraction of total height)
+#         horizontal_flip=True, # randomly flip images
+#         vertical_flip=False) # randomly flip images
 
 
-datagen.fit(X_train[0:500].astype('float64'))
-batch_size=32
-nb_epoch=10
-model.fit_generator(datagen.flow(X_train, Y_train,
-                        batch_size=batch_size),
-                        samples_per_epoch=X_train.shape[0],
-                        nb_epoch=nb_epoch,
-                        validation_data=(X_test, Y_test))
-# model.fit(h5f['data'], Y_train,validation_split=0.1, nb_epoch=10, batch_size=32)
+# datagen.fit(X_train[0:500].astype('float64'))
+# batch_size=32
+# nb_epoch=10
+# model.fit_generator(datagen.flow(X_train, Y_train,
+#                         batch_size=batch_size),
+#                         samples_per_epoch=X_train.shape[0],
+#                         nb_epoch=nb_epoch,
+#                         validation_data=(X_test, Y_test))
+# model.fit(X_train,Y_train,validation_split=0.1, nb_epoch=10,batch_size=32)
+model.fit(X_train, Y_train, nb_epoch=10, batch_size=32)
 
 
 model.save_weights('ava_vgg.h5')
@@ -170,17 +187,22 @@ print model.predict(np.expand_dims(image_resized.T, axis=0))
 
 
 def image_to_pickle():
+
+  delta = 1.5
+
+
   ava_path = "dataset/AVA/data/"
   ava_data_path = os.path.join(os.getcwd(), ava_path)
   store = HDFStore('labels.h5')
-  ava_table = store['labels']
+  ava_table = store['labels_train']
+  ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
 
 
   channel = 3
   width= 224
   height = 224
 
-  h5f = h5py.File('images_224.h5', 'w')
+  h5f = h5py.File('images_224_delta_1.5.h5', 'w')
 
   print "Checking for invalid images ..."
   invalid_indices = []
@@ -207,6 +229,8 @@ def image_to_pickle():
   i=0
   invalid_indices = []
   for index, row in ava_table.iterrows():
+    if(i >= periodNum):
+      break
     if (i % 1000) == 0:
       print "Now processing " + str(i) + "/" + str(periodNum)
     filename = str(index) + ".jpg"
@@ -221,7 +245,6 @@ def image_to_pickle():
   store.close()
 
 def image_to_test():
-
   ava_path = "dataset/AVA/data/"
   ava_data_path = os.path.join(os.getcwd(), ava_path)
 
@@ -248,6 +271,7 @@ def image_to_test():
     ava_table = ava_table.drop(invalid_indices)
     store['labels_test'] = ava_table
   store['labels_test'] = store['labels_test'].join(store['labels'])
+  store['labels_train'] = store['labels'].drop(store['labels_test'].index)
   imagesCount = ava_table.shape[0]
   channel = 3
   width= 224

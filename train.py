@@ -30,7 +30,7 @@ from keras.optimizers import SGD
 # ava_table = pd.read_table("dataset/AVA/AVA.txt", delim_whitespace=True)
 store = HDFStore('labels.h5')
 # delta = 1
-ava_table = store['labels']
+ava_table = store['labels_train']
 # ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
 h5f = h5py.File('images.h5','r')
 # X = h5f['images'][:]
@@ -73,11 +73,11 @@ model.add(Dense(64, activation='relu'))
 model.add(Dropout(0.5))
 model.add(Dense(2, activation='softmax'))
 
-model.compile(loss='binary_crossentropy',
+model.compile(loss='categorical_crossentropy',
               optimizer='adam',
               metrics=['accuracy'])
 
-model.fit(X_train, Y_train, nb_epoch=100, batch_size=512, callbacks=[hera_model.callback])
+model.fit(X_train, Y_train, nb_epoch=20, batch_size=64)
 
 score = model.evaluate(X_test, Y_test)
 
