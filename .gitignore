@@ -2,3 +2,4 @@ dataset/
 *.p
 *.h5
 *.p#
+.DS_Store
