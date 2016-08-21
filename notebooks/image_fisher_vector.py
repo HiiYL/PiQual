@@ -105,7 +105,12 @@ class ImageFisherVector(object):
         N, D = concatenated_descriptors.shape
         K=128
 
-        ggmm.init(3712925)
+        if(N > 3000000):
+            batch_size = int(N / 2)
+        else:
+            batch_size = N
+
+        ggmm.init(batch_size * D)
         gmm = ggmm.GMM(K,D)
 
         thresh = 1e-3 # convergence threshold
@@ -113,7 +118,7 @@ class ImageFisherVector(object):
         init_params = 'wmc' # initialize weights, means, and covariances
 
         # train GMM
-        gmm.fit(concatenated_descriptors, thresh, n_iter, init_params=init_params)
+        gmm.fit(concatenated_descriptors[:batch_size], thresh, n_iter, init_params=init_params)
 
         return gmm
 
