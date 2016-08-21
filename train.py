@@ -6,18 +6,6 @@ from pandas import HDFStore, DataFrame
 
 import h5py
 # from __future__ import division
-from heraspy.model import HeraModel
-
-hera_model = HeraModel(
-    {
-        'id': 'my-model' # any ID you want to use to identify your model
-    },
-    {
-        # location of the local hera server, out of the box it's the following
-        'domain': 'localhost',
-        'port': 4000
-    }
-)
 
 from keras.models import Sequential
 from keras.layers import Dense, Activation
@@ -180,8 +168,8 @@ def good(c):
   else:
     return 0
 def preprocess():
-  ava_table = pd.read_table("dataset/AVA/AVA.txt", delim_whitespace=True, index_col=0,
-   header=None,usecols=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])#,names=["Image_ID",1,2,3,4,5,6,7,8,9,10,"ST_ID", "ST_ID", "C_ID"])
+  ava_table = pd.read_table("AVA.txt", delim_whitespace=True, index_col=0,
+   header=None,usecols=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
   ava_table.sort_index(inplace=True)
 
   ava_score_only = pd.DataFrame(index=ava_table.index)
@@ -190,10 +178,10 @@ def preprocess():
 
   print("Preprocessing...")
   for index, row in ava_table.iterrows():
-    sum_ratings = row[1:11].sum()
+    sum_ratings = row[2:11].sum()
     count=1
     sum_ratings_weighted = 0
-    for column in row[1:11]:
+    for column in row[2:11]:
       sum_ratings_weighted += column * count
       count=count+1
     averaged_score[index] = sum_ratings_weighted / sum_ratings

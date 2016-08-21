@@ -193,8 +193,8 @@ def image_to_pickle():
 
   ava_path = "dataset/AVA/data/"
   ava_data_path = os.path.join(os.getcwd(), ava_path)
-  store = HDFStore('labels.h5')
-  ava_table = store['labels_train']
+  store = HDFStore('dataset_h5/labels.h5')
+  ava_table = store['labels']
   ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
 
 
