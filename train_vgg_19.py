@@ -132,11 +132,11 @@ if __name__ == "__main__":
     model.fit(X_train, Y_train, nb_epoch=1,shuffle="batch")
 
 
-    model.save_weights('ava_vgg_19.h5')
+    model.save_weights('ava_vgg_19_1.5.h5')
 
     score = model.evaluate(X_test, Y_test)
-    print 
-    print('Test score:', score[0])
-    print('Test accuracy:', score[1])
-    print
-    print "Predictions"
+    print()
+    print('Test score:{0}'.format(score[0]))
+    print('Test accuracy:{0}'.format(score[1]))
+    print()
+    print("Predictions")

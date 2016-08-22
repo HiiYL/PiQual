@@ -12,7 +12,6 @@ from sklearn.metrics import accuracy_score
 import pandas as pd
 from pandas import HDFStore, DataFrame
 import pickle
-#import pdb
 
 class ImageFisherVector(object):
     dataset_dir = '../dataset_h5/'
@@ -25,7 +24,7 @@ class ImageFisherVector(object):
             labels_train = np.load("labels_train.npy")
             fv = np.load("fisher_vector.npy")
         except FileNotFoundError:
-            skipped_indices, fv = process_images(store['labels_train'])
+            skipped_indices, fv = process_images(store['labels_train'],1.5)
             labels_train = load_labels(skipped_indices, 'labels_train')
             np.save("labels_train.npy",labels_train )
             np.save("fisher_vector.npy",fv )
@@ -33,11 +32,12 @@ class ImageFisherVector(object):
         classifier = train(fv,labels_train)
         pickle.dump( classifier, open( "classifier.p", "wb" ) ) 
 
+        classifier =  pickle.load( open( "classifier.p", "rb" ) )
+
         try:
             labels_test = np.load("labels_test.npy")
             fv_test = np.load("fisher_vector_test.npy")
         except FileNotFoundError:
-            h5f_test = h5py.File(os.path.join(dataset_dir,test_filename),'r')
             skipped_indices_test, fv_test = process_images(store['labels_test'])
             labels_test = load_labels(skipped_indices_test, 'labels_test')
             np.save("labels_test.npy",labels_test )
@@ -47,8 +47,9 @@ class ImageFisherVector(object):
         accuracy_score(labels_test, classifier.predict(fv_test))
 
 
-    def process_images(ava_table):
-        ava_path = "dataset/AVA/data/"
+    def process_images(ava_table, delta=0):
+        ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
+        ava_path = "../dataset/AVA/data/"
         ava_data_path = os.path.join(os.getcwd(), ava_path)
 
         skipped_indices = []
@@ -56,21 +57,24 @@ class ImageFisherVector(object):
 
         periodNum = ava_table.shape[0]
 
+
+        i=0
         for index, row in ava_table.iterrows():
-            print("Running SIFT on Images ...")
             if(i >= periodNum):
               break
-            if (i % 1000) == 0:
+            if (i % 100) == 0:
               print('Now Processing {0}/{1}'.format(i,periodNum))
-            filename = str(index) + ".jpg"
+            filename = "{0}.jpg".format(index)
+
             filepath = os.path.join(ava_data_path, filename)
-            image = ndimage.imread(filepath, mode="RGB")
+            image = cv2.imread(filepath)
             image_features = extract_image_features(image)
             if image_features is not None:
                 image_features_list.append(image_features)
             else:
                 print(index)
                 skipped_indices.append(index)
+            i = i + 1
 
         image_descriptors_reduced = reduce_features(image_features_list)
 
@@ -98,7 +102,7 @@ class ImageFisherVector(object):
         #    images_with_no_features = [i for i in images_with_no_features if i <= n_labels]
         if(n_labels!=-1):
             ava_table = ava_table.head(n_labels)
-        ava_table = ava_table.drop(ava_table.iloc[images_with_no_features].index.values)
+        ava_table = ava_table.drop(ava_table.ix[images_with_no_features].index)
 
         return ava_table.good
 
@@ -106,8 +110,7 @@ class ImageFisherVector(object):
 
     def extract_image_features(image):
         sift = cv2.xfeatures2d.SIFT_create()
-        image_bgr = cv2.cvtColor(image.T, cv2.COLOR_RGB2BGR)
-        _ , descriptors =  sift.detectAndCompute(image_bgr, None)
+        _ , descriptors =  sift.detectAndCompute(image, None)
         return descriptors
 
 
