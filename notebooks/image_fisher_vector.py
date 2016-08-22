@@ -11,32 +11,38 @@ from sklearn.metrics import accuracy_score
 
 import pandas as pd
 from pandas import HDFStore, DataFrame
+import pickle
 #import pdb
 
 class ImageFisherVector(object):
     dataset_dir = '../dataset_h5/'
     skipped_indices = []
     filename = 'images_224_delta_1.5.h5'
-    test_filename = 'images.h5'
+    test_filename = 'images_224.h5'
     def __init__(self):
-        h5f = h5py.File(os.path.join(dataset_dir,filename),'r')
         try:
-            skipped_indices = np.load("skipped_indices.npy")
+            labels_train = np.load("labels_train.npy")
             fv = np.load("fisher_vector.npy")
         except FileNotFoundError:
+            h5f = h5py.File(os.path.join(dataset_dir,filename),'r')
             skipped_indices, fv = process_images(h5f['data'])
-            np.save("skipped_indices.npy",skipped_indices )
+            labels_train = load_labels(skipped_indices, 'labels_train')
+            np.save("labels_train.npy",labels_train )
             np.save("fisher_vector.npy",fv )
             
-        labels = load_labels(skipped_indices, 'labels_train')
-        classifier = train(fv,labels)
+        classifier = train(fv,labels_train)
+        pickle.dump( classifier, open( "classifier.p", "wb" ) ) 
 
+        try:
+            labels_test = np.load("labels_test.npy")
+            fv_test = np.load("fisher_vector_test.npy")
+        except FileNotFoundError:
+            h5f_test = h5py.File(os.path.join(dataset_dir,test_filename),'r')
+            skipped_indices_test, fv_test = process_images(h5f_test['data_test'])
+            labels_test = load_labels(skipped_indices_test, 'labels_test')
+            np.save("labels_test.npy",labels_test )
+            np.save("fisher_vector_test.npy",fv_test )
 
-        h5f_test = h5py.File(os.path.join(dataset_dir,test_filename),'r')
-        X_test = h5f_test['data_test'][:]
-        skipped_indices_test, fv_test = process_images(X_test)
-
-        labels_test = load_labels(skipped_indices_test, 'labels_test')
 
         accuracy_score(labels_test, classifier.predict(fv_test))
 
@@ -46,9 +52,12 @@ class ImageFisherVector(object):
         image_features_list = []
         print("Running SIFT on Images ...")
         for index, image in enumerate(images):
-            image_features = extract_image_features(image,index, skipped_indices)
+            image_features = extract_image_features(image)
             if image_features is not None:
                 image_features_list.append(image_features)
+            else:
+                print(index)
+                skipped_indices.append(index)
 
         image_descriptors_reduced = reduce_features(image_features_list)
 
@@ -82,15 +91,10 @@ class ImageFisherVector(object):
 
 
 
-    def extract_image_features(image, current_index,skipped_indices):
+    def extract_image_features(image):
         sift = cv2.xfeatures2d.SIFT_create()
         image_bgr = cv2.cvtColor(image.T, cv2.COLOR_RGB2BGR)
         _ , descriptors =  sift.detectAndCompute(image_bgr, None)
-        try:
-            descriptors.shape
-        except AttributeError:
-            print(current_index)
-            skipped_indices.append(current_index)
         return descriptors
 
 
@@ -106,7 +110,7 @@ class ImageFisherVector(object):
         K=128
 
         if(N > 3000000):
-            batch_size = int(N / 2)
+            batch_size = 3000000
         else:
             batch_size = N
 
