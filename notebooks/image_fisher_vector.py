@@ -18,28 +18,40 @@ class ImageFisherVector(object):
     skipped_indices = []
     filename = 'images_224_delta_1.5.h5'
     test_filename = 'images_224.h5'
+
+    classifier_filename = "classifier.p"
+
+    gmm_filename = 'gmm.pkl'
+
+    delta = 2.5
+
+    gmm = ""
     def __init__(self):
         store = HDFStore('../dataset_h5/labels.h5')
-        try:
-            labels_train = np.load("labels_train.npy")
-            fv = np.load("fisher_vector.npy")
-        except FileNotFoundError:
-            skipped_indices, fv = process_images(store['labels_train'],1.5)
-            labels_train = load_labels(skipped_indices, 'labels_train')
-            np.save("labels_train.npy",labels_train )
-            np.save("fisher_vector.npy",fv )
-            
-        classifier = train(fv,labels_train)
-        pickle.dump( classifier, open( "classifier.p", "wb" ) ) 
-
-        classifier =  pickle.load( open( "classifier.p", "rb" ) )
+        if(os.path.isfile(classifier_filename) and os.path.isfile(gmm_filename)):
+            classifier =  pickle.load( open( "classifier.p", "rb" ) )
+            print("Loaded Classifier!")
+            gmm = load_gmm()
+        else:
+            try:
+                labels_train = np.load("labels_train.npy")
+                fv = np.load("fisher_vector_train.npy")
+            except FileNotFoundError:
+                labels_to_train = store['labels_train']
+                skipped_indices, fv,gmm = process_images(labels_to_train,delta=delta,is_training=True)
+                labels_train = load_labels(skipped_indices,labels_to_train, True,delta)
+                np.save("labels_train.npy",labels_train )
+                np.save("fisher_vector_train.npy",fv )
+            classifier = train(fv,labels_train)
+            pickle.dump( classifier, open( "classifier.p", "wb" ) ) 
 
         try:
             labels_test = np.load("labels_test.npy")
             fv_test = np.load("fisher_vector_test.npy")
         except FileNotFoundError:
-            skipped_indices_test, fv_test = process_images(store['labels_test'])
-            labels_test = load_labels(skipped_indices_test, 'labels_test')
+            labels_to_test = store['labels_test'][:100]
+            skipped_indices_test, fv_test = process_images(labels_to_test,is_training=False, input_gmm=gmm)
+            labels_test = load_labels(skipped_indices_test,labels_to_test, False)
             np.save("labels_test.npy",labels_test )
             np.save("fisher_vector_test.npy",fv_test )
 
@@ -47,7 +59,7 @@ class ImageFisherVector(object):
         accuracy_score(labels_test, classifier.predict(fv_test))
 
 
-    def process_images(ava_table, delta=0):
+    def process_images(ava_table, is_training,gmm="",delta=0,input_gmm=None):
         ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
         ava_path = "../dataset/AVA/data/"
         ava_data_path = os.path.join(os.getcwd(), ava_path)
@@ -57,11 +69,10 @@ class ImageFisherVector(object):
 
         periodNum = ava_table.shape[0]
 
+        image_descriptors_filename = "image_descriptors_{0}".format(is_training)
 
         i=0
         for index, row in ava_table.iterrows():
-            if(i >= periodNum):
-              break
             if (i % 100) == 0:
               print('Now Processing {0}/{1}'.format(i,periodNum))
             filename = "{0}.jpg".format(index)
@@ -69,40 +80,46 @@ class ImageFisherVector(object):
             filepath = os.path.join(ava_data_path, filename)
             image = cv2.imread(filepath)
             image_features = extract_image_features(image)
-            if image_features is not None:
+
+            if image_features is not None and image_features.shape[0] >= 64:
+                image_features = reduce_features(image_features)
+                #print("{0} - {1}".format(index, image_features.shape))
                 image_features_list.append(image_features)
             else:
                 print(index)
                 skipped_indices.append(index)
             i = i + 1
 
-        image_descriptors_reduced = reduce_features(image_features_list)
-
-        print("Generating GMM")
-        gmm = generate_gmm(image_descriptors_reduced)
+        #[ reduce_features(image_features) for image_features in image_features_list]
+        if input_gmm is None:
+            print("Generating GMM")
+            gmm = generate_gmm(image_features_list)
+            #pickle.dump(gmm,open("gmm.pkl","wb"))
+        else:
+            print("Loading training GMM for test set")
+            gmm = input_gmm
+            #gmm = pickle.load(open("gmm.pkl", "rb"))
 
         print("Generating Fisher Vector")
-        fv = [ fisher_vector(image,gmm) for image in image_descriptors_reduced]
+        fv = [ fisher_vector(image,gmm) for image in image_features_list]
 
-        return skipped_indices, fv
-
+        if is_training:
+            return skipped_indices, fv,gmm
+        else:
+            return skipped_indices, fv
 
 
         #return (skipped_indices, np.asarray(image_features_list))
 
         #return [extract_image_features(image,index, skipped_indices) for index, image in enumerate(images, 1)]
 
-    def load_labels(images_with_no_features, label_type, n_labels=-1):
-        store = HDFStore('../dataset_h5/labels.h5')
-        ava_table = store[label_type]
-        if(label_type == 'labels_train'):
-            ava_table = ava_table[( abs(ava_table.score - 5) >= 1.5)]
+    def load_labels(skipped_indices, ava_table, is_training, delta=0):
+        if is_training:
+            ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
 
         #if n_labels < images_with_no_features[len(images_with_no_features) - 1]:
         #    images_with_no_features = [i for i in images_with_no_features if i <= n_labels]
-        if(n_labels!=-1):
-            ava_table = ava_table.head(n_labels)
-        ava_table = ava_table.drop(ava_table.ix[images_with_no_features].index)
+        ava_table = ava_table.drop(ava_table.ix[skipped_indices].index)
 
         return ava_table.good
 
@@ -116,14 +133,19 @@ class ImageFisherVector(object):
 
 
     def reduce_features(image_descriptors):
-        pca = PCA(n_components=64)# adjust yourself
-        pca.fit(np.concatenate(image_descriptors[:5000]))
-        return np.asarray([ pca.transform(image) for image in image_descriptors])
+        # if image_descriptors.shape[0] < 64:
+        #     pca = decomposition.SparsePCA(n_components=64)# adjust yourself
+        # else:
+        pca = PCA(n_components=64)
+        return (pca.fit_transform(image_descriptors))
 
-    def generate_gmm(image_descriptors_reduced):
-        concatenated_descriptors = np.concatenate(image_descriptors_reduced)
+    def generate_gmm(image_features_list):
+        concatenated_descriptors = np.concatenate(image_features_list)
+        gmm_filename = 'gmm.pkl'
         N, D = concatenated_descriptors.shape
         K=128
+
+        print("The sizes are {0} and {1}".format(N,D))
 
         if(N > 3000000):
             batch_size = 3000000
@@ -138,10 +160,24 @@ class ImageFisherVector(object):
         init_params = 'wmc' # initialize weights, means, and covariances
 
         # train GMM
-        gmm.fit(concatenated_descriptors[:batch_size], thresh, n_iter, init_params=init_params)
+        converged = gmm.fit(concatenated_descriptors[:batch_size], thresh, n_iter, init_params=init_params)
+
+        print("GMM converged? ... {0}".format(converged))
+
+        pickle.dump((gmm.get_weights(), gmm.get_means(), gmm.get_covars()), open(gmm_filename,'wb'))
 
         return gmm
 
+    def load_gmm():
+        wmc = pickle.load(open("gmm.pkl","rb"))
+        ggmm.init(wmc[0].shape[0] * 64)
+        gmm = ggmm.GMM(wmc[0].shape[0],64)
+
+        gmm.set_weights(wmc[0])
+        gmm.set_means(wmc[1])
+        gmm.set_covars(wmc[2])
+        print("Loaded GMM Info!")
+        return gmm
 
     def fisher_vector(xx, gmm):
         """Computes the Fisher vector on a set of descriptors.
