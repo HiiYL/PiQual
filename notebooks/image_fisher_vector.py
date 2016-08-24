@@ -23,7 +23,7 @@ class ImageFisherVector(object):
 
     gmm_filename = 'gmm.pkl'
 
-    delta = 2.5
+    delta = 1.5
 
     gmm = ""
     def __init__(self):
@@ -42,6 +42,7 @@ class ImageFisherVector(object):
                 labels_train = load_labels(skipped_indices,labels_to_train, True,delta)
                 np.save("labels_train.npy",labels_train )
                 np.save("fisher_vector_train.npy",fv )
+                np.save("skipped_indices.npy",skipped_indices)
             classifier = train(fv,labels_train)
             pickle.dump( classifier, open( "classifier.p", "wb" ) ) 
 
@@ -49,11 +50,12 @@ class ImageFisherVector(object):
             labels_test = np.load("labels_test.npy")
             fv_test = np.load("fisher_vector_test.npy")
         except FileNotFoundError:
-            labels_to_test = store['labels_test'][:100]
+            labels_to_test = store['labels_test']
             skipped_indices_test, fv_test = process_images(labels_to_test,is_training=False, input_gmm=gmm)
             labels_test = load_labels(skipped_indices_test,labels_to_test, False)
             np.save("labels_test.npy",labels_test )
             np.save("fisher_vector_test.npy",fv_test )
+            np.save("skipped_indices_test.npy",skipped_indices_test)
 
 
         accuracy_score(labels_test, classifier.predict(fv_test))
@@ -122,6 +124,17 @@ class ImageFisherVector(object):
         ava_table = ava_table.drop(ava_table.ix[skipped_indices].index)
 
         return ava_table.good
+
+    def load_full_labels(skipped_indices, ava_table, is_training, delta=0):
+        if is_training:
+            ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
+
+        #if n_labels < images_with_no_features[len(images_with_no_features) - 1]:
+        #    images_with_no_features = [i for i in images_with_no_features if i <= n_labels]
+        ava_table = ava_table.drop(ava_table.ix[skipped_indices].index)
+
+        return ava_table
+
 
 
 

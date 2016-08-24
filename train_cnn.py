@@ -221,7 +221,7 @@ def image_to_test():
 
 def image_to_pickle():
 
-  delta = 1.5
+  delta = 1
 
 
   ava_path = "dataset/AVA/data/"
@@ -235,7 +235,7 @@ def image_to_pickle():
   width= 224
   height = 224
 
-  h5f = h5py.File('dataset_h5/images_224_delta_1.5.h5', 'w')
+  h5f = h5py.File('dataset_h5/images_224_delta_1.0.h5', 'w')
 
   periodNum = ava_table.shape[0]
   data = h5f.create_dataset("data", (periodNum,channel,width,height), dtype='uint8')

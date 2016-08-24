@@ -77,14 +77,16 @@ if __name__ == "__main__":
 
     # num_training = 9000
     # num_test = 1000
+
+    delta = 1.0
     store = HDFStore('dataset_h5/labels.h5')
     # delta = 1
     ava_table = store['labels_train']
 
-    ava_table = ava_table[( abs(ava_table.score - 5) >= 1.5)]
+    ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
     # X_train = np.hstack(X).reshape(10000,224,224,3)
     # X = pickle.load( open("images_224.p", "rb"))
-    h5f = h5py.File('dataset_h5/images_224_delta_1.5.h5','r')
+    h5f = h5py.File('dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
     X_train = h5f['data']
     #X_train = np.hstack(X).reshape(3,224,224,16160).T
 
@@ -121,7 +123,7 @@ if __name__ == "__main__":
 
 
     model = VGG_19('vgg19_weights.h5')
-    for layer in model.layers:
+    for layer in model.layers[:19]:
         layer.trainable = False
     model.layers.pop()
     model.layers.pop()
@@ -129,7 +131,7 @@ if __name__ == "__main__":
     model.add(Dense(output_dim=2, activation='softmax',name='dense_4'))
 
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-    model.fit(X_train, Y_train, nb_epoch=1,shuffle="batch")
+    model.fit(X_train, Y_train, nb_epoch=10,shuffle="batch")
 
 
     model.save_weights('ava_vgg_19_1.5.h5')
