@@ -38,10 +38,11 @@ confidence = classifier.decision_function(fv_test)
 labels_test = load_full_labels(skipped_indices,labels_to_test, False)
 labels_test['confidence'] = confidence
 
-top_confidence_good = abels_test.ix[labels_test.good ==1 ].sort('confidence', ascending=False)[:10]
+top_confidence_good = labels_test.ix[labels_test.good ==1 ].sort('confidence', ascending=False)[:10]
 
 for index, row in top_confidence_good.iterrows():
     filename = "{0}.jpg".format(index)
 
     filepath = os.path.join(ava_data_path, filename)
     image = cv2.imread(filepath)
+    top

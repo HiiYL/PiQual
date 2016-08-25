@@ -5,7 +5,7 @@ import cv2
 from sklearn.decomposition import PCA
 import ggmm.gpu as ggmm
 
-from sklearn import svm
+from sklearn import svm, linear_model
 from sklearn.metrics import accuracy_score
 
 
@@ -34,31 +34,33 @@ class ImageFisherVector(object):
             gmm = load_gmm()
         else:
             try:
-                labels_train = np.load("labels_train.npy")
+                labels_train = store['labels_train_trimmed']
                 fv = np.load("fisher_vector_train.npy")
-            except FileNotFoundError:
+            except(FileNotFoundError,KeyError) as e:
                 labels_to_train = store['labels_train']
                 skipped_indices, fv,gmm = process_images(labels_to_train,delta=delta,is_training=True)
                 labels_train = load_labels(skipped_indices,labels_to_train, True,delta)
-                np.save("labels_train.npy",labels_train )
+                store['labels_train_trimmed'] = labels_train
                 np.save("fisher_vector_train.npy",fv )
                 np.save("skipped_indices.npy",skipped_indices)
-            classifier = train(fv,labels_train)
+            classifier = train(fv,labels_train.score)
+            #classifier = train(fv,labels_train.good)
             pickle.dump( classifier, open( "classifier.p", "wb" ) ) 
 
         try:
-            labels_test = np.load("labels_test.npy")
+            labels_test = store['labels_test_trimmed']
             fv_test = np.load("fisher_vector_test.npy")
-        except FileNotFoundError:
+        except(FileNotFoundError,KeyError) as e:
             labels_to_test = store['labels_test']
             skipped_indices_test, fv_test = process_images(labels_to_test,is_training=False, input_gmm=gmm)
             labels_test = load_labels(skipped_indices_test,labels_to_test, False)
-            np.save("labels_test.npy",labels_test )
+            store['labels_test_trimmed'] = labels_test
             np.save("fisher_vector_test.npy",fv_test )
             np.save("skipped_indices_test.npy",skipped_indices_test)
 
 
-        accuracy_score(labels_test, classifier.predict(fv_test))
+        accuracy_score(labels_test.good, [ 0 if label < 5 else 1 for label in classifier.predict(fv_test)])
+        #accuracy_score(labels_test.good, classifier.predict(fv_test))
 
 
     def process_images(ava_table, is_training,gmm="",delta=0,input_gmm=None):
@@ -71,26 +73,32 @@ class ImageFisherVector(object):
 
         periodNum = ava_table.shape[0]
 
-        image_descriptors_filename = "image_descriptors_{0}".format(is_training)
+        image_descriptors_filename = "image_descriptors_{0}_{1}.pkl".format(is_training,periodNum)
 
-        i=0
-        for index, row in ava_table.iterrows():
-            if (i % 100) == 0:
-              print('Now Processing {0}/{1}'.format(i,periodNum))
-            filename = "{0}.jpg".format(index)
+        if(os.path.isfile(image_descriptors_filename)):
+            print("Image Descriptors Loaded!!")
+            image_features_list = pickle.load(open(image_descriptors_filename,"rb"))
+        else:
+            print("Image Descriptors Not Found, Generating....")
+            i=0
+            for index, row in ava_table.iterrows():
+                if (i % 100) == 0:
+                  print('Now Processing {0}/{1}'.format(i,periodNum))
+                filename = "{0}.jpg".format(index)
 
-            filepath = os.path.join(ava_data_path, filename)
-            image = cv2.imread(filepath)
-            image_features = extract_image_features(image)
+                filepath = os.path.join(ava_data_path, filename)
+                image = cv2.imread(filepath)
+                image_features = extract_image_features(image)
 
-            if image_features is not None and image_features.shape[0] >= 64:
-                image_features = reduce_features(image_features)
-                #print("{0} - {1}".format(index, image_features.shape))
-                image_features_list.append(image_features)
-            else:
-                print(index)
-                skipped_indices.append(index)
-            i = i + 1
+                if image_features is not None and image_features.shape[0] >= 64:
+                    image_features = reduce_features(image_features)
+                    #print("{0} - {1}".format(index, image_features.shape))
+                    image_features_list.append(image_features)
+                else:
+                    print(index)
+                    skipped_indices.append(index)
+                i = i + 1
+            pickle.dump(image_features_list,open(image_descriptors_filename,"wb"))
 
         #[ reduce_features(image_features) for image_features in image_features_list]
         if input_gmm is None:
@@ -123,7 +131,7 @@ class ImageFisherVector(object):
         #    images_with_no_features = [i for i in images_with_no_features if i <= n_labels]
         ava_table = ava_table.drop(ava_table.ix[skipped_indices].index)
 
-        return ava_table.good
+        return ava_table
 
     def load_full_labels(skipped_indices, ava_table, is_training, delta=0):
         if is_training:
@@ -240,7 +248,9 @@ class ImageFisherVector(object):
         X = features
         Y = labels
 
-        clf = svm.LinearSVC()
+        clf = svm.LinearSVR()
+
+        #clf = linear_model.SGDRegressor()
         clf.fit(X, Y)
 
         return clf
