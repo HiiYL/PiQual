@@ -6,7 +6,7 @@ from sklearn.decomposition import PCA
 import ggmm.gpu as ggmm
 
 from sklearn import svm, linear_model
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score,f1_score,roc_auc_score,roc_curve
 
 
 import pandas as pd
@@ -45,7 +45,8 @@ class ImageFisherVector(object):
                 np.save("skipped_indices.npy",skipped_indices)
             classifier = train(fv,labels_train.score)
             #classifier = train(fv,labels_train.good)
-            pickle.dump( classifier, open( "classifier.p", "wb" ) ) 
+            pickle.dump( classifier, open( "classifier_linearSVR.p", "wb" ) ) 
+            pickle.dump( classifierSVC, open( "classifier_linearSVC.p", "wb" ) ) 
 
         try:
             labels_test = store['labels_test_trimmed']
@@ -60,7 +61,13 @@ class ImageFisherVector(object):
 
 
         accuracy_score(labels_test.good, [ 0 if label < 5 else 1 for label in classifier.predict(fv_test)])
+        f1_score(labels_test.good, [ 0 if label < 0 else 1 for label in classifier.predict(fv_test)])
+        roc_auc_score(labels_test.good, [ 0 if label < 0 else 1 for label in classifier.predict(fv_test)])
         #accuracy_score(labels_test.good, classifier.predict(fv_test))
+        roc_auc_score(labels_test.good, classifierSVC.predict(fv_test))
+        f1_score(labels_test.good, classifierSVC.predict(fv_test))
+
+
 
 
     def process_images(ava_table, is_training,gmm="",delta=0,input_gmm=None):
@@ -248,7 +255,7 @@ class ImageFisherVector(object):
         X = features
         Y = labels
 
-        clf = svm.LinearSVR()
+        clf = svm.LinearSVC()
 
         #clf = linear_model.SGDRegressor()
         clf.fit(X, Y)

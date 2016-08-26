@@ -65,7 +65,7 @@ def VGG_19(weights_path=None):
     model.add(Dropout(0.5))
     model.add(Dense(4096, activation='relu'))
     model.add(Dropout(0.5))
-    model.add(Dense(1000, activation='softmax'))
+    model.add(Dense(2, activation='softmax'))
 
     if weights_path:
         model.load_weights(weights_path)
@@ -118,15 +118,12 @@ if __name__ == "__main__":
     # X_test -= np.mean(X_test)
     # X_test /= 255
 
-    weights_path = os.path.join(os.getcwd(), "vgg19_weights.h5")
+    weights_path = os.path.join(os.getcwd(), "ava_vgg_19_1.5_6.h5")
 
 
 
     model = VGG_19('vgg19_weights.h5')
-    #for layer in model.layers[:19]:
-    #    layer.trainable = False
-    model.layers.pop()
-    model.add(Dense(output_dim=2, activation='softmax'))
+    
 
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
