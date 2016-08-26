@@ -6,6 +6,8 @@ import pickle
 import pandas as pd
 from pandas import HDFStore, DataFrame
 
+from keras.models import load_model
+
 import h5py
 
 from keras.models import Sequential
@@ -122,7 +124,9 @@ if __name__ == "__main__":
 
 
 
-    model = VGG_19(weights_path)
+    #model = VGG_19(weights_path)
+
+    model = load_model(weights_path)
     
 
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
