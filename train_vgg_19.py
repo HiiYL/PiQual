@@ -118,7 +118,7 @@ if __name__ == "__main__":
     # X_test -= np.mean(X_test)
     # X_test /= 255
 
-    weights_path = os.path.join(os.getcwd(), "vgg19_weights.h5")
+    #weights_path = os.path.join(os.getcwd(), "ava_vgg_19_1.5_5.h5")
 
 
 
@@ -126,14 +126,18 @@ if __name__ == "__main__":
     #for layer in model.layers[:19]:
     #    layer.trainable = False
     model.layers.pop()
+    model.outputs = [model.layers[-1].output]
+    model.layers[-1].outbound_nodes = []
     model.add(Dense(output_dim=2, activation='softmax'))
+
+    model.save_weights('ava_vgg_19_{0}.h5'.format(delta))
 
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
     model.fit(X_train, Y_train, nb_epoch=10,shuffle="batch")
 
 
-    model.save_weights('ava_vgg_19_1.5.h5')
+    model.save_weights(('ava_vgg_19_{0}.h5'.format(delta))
 
     score = model.evaluate(X_test, Y_test)
     print()

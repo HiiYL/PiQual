@@ -68,7 +68,7 @@ def VGG_19(weights_path=None):
     model.add(Dense(2, activation='softmax'))
 
     if weights_path:
-        model.load_weights(weights_path)
+        model.load_model(weights_path)
 
     return model
 
@@ -118,11 +118,11 @@ if __name__ == "__main__":
     # X_test -= np.mean(X_test)
     # X_test /= 255
 
-    weights_path = os.path.join(os.getcwd(), "ava_vgg_19_1.5_6.h5")
+    weights_path = os.path.join(os.getcwd(), "ava_vgg_19_{0}_5.h5".format(delta))
 
 
 
-    model = VGG_19('vgg19_weights.h5')
+    model = VGG_19(weights_path)
     
 
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     model.fit(X_train, Y_train, nb_epoch=10,shuffle="batch")
 
 
-    model.save_weights('ava_vgg_19_1.5.h5')
+    model.save('ava_vgg_19_{0}_5.h5'.format(delta))
 
     score = model.evaluate(X_test, Y_test)
     print()
