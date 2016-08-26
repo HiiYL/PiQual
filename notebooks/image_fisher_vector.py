@@ -45,9 +45,6 @@ class ImageFisherVector(object):
                 np.save("skipped_indices.npy",skipped_indices)
             classifier = train(fv,labels_train.score)
             #classifier = train(fv,labels_train.good)
-            pickle.dump( classifier, open( "classifier_linearSVR.p", "wb" ) ) 
-            pickle.dump( classifierSVC, open( "classifier_linearSVC.p", "wb" ) ) 
-
         try:
             labels_test = store['labels_test_trimmed']
             fv_test = np.load("fisher_vector_test.npy")
