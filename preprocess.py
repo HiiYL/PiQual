@@ -11,11 +11,14 @@ def good(c):
 ava_table = pd.read_table("dataset/AVA/AVA.txt", delim_whitespace=True, index_col=0,
 header=None,usecols=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
 
-sum_of_ratings = (ava_table.ix[:,2:11]).sum(axis=1)
-weights = [1,2,3,4,5,6,7,8,9,10]
+sum_of_ratings = (ava_table.ix[:,:10]).sum(axis=1)
+weights = np.array([1,2,3,4,5,6,7,8,9,10])
 score = (ava_table.ix[:,2:11] * weights).sum(axis=1) / sum_of_ratings
 
 ava_table['score'] = score
+
+standard_deviation = np.sqrt(((ava_table.ix[:,:10] * np.square(weights)).sum(axis=1) / sum_of_ratings) - (ava_table.score ** 2))
+ava_table['standard_deviation'] = standard_deviation
 
 ava_table['good'] = ava_table.apply(good, axis=1)
 
