@@ -124,9 +124,9 @@ if __name__ == "__main__":
 
 
 
-    #model = VGG_19(weights_path)
+    model = VGG_19()
 
-    model = load_model(weights_path)
+    #odel = load_model(weights_path)
     
 
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)

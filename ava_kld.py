@@ -110,10 +110,10 @@ if __name__ == "__main__":
 
     Y_train = ava_table.ix[:,['score','standard_deviation']].as_matrix()
 
-    Y_train[:,1] -= 1
     Y_train[:,0] /= 10
+    Y_train[:,1] -= 1
 
-
+    #Y_train = ava_table.ix[:,['score']].as_matrix()
 
 
     h5f_test = h5py.File('dataset_h5/images_224.h5','r')
@@ -121,6 +121,11 @@ if __name__ == "__main__":
     ava_test = store['labels_test']
 
     Y_test = ava_test.ix[:,['score','standard_deviation']].as_matrix()
+
+    Y_test[:,0] /= 10
+    Y_test[:,1] -= 1
+
+   # Y_test = ava_test.ix[:,['score']].as_matrix()
     # Y_test = ava_test.ix[:, "good"].as_matrix()
     # Y_test = to_categorical(Y_test, 2)
 
@@ -149,12 +154,12 @@ if __name__ == "__main__":
     model.layers.pop()
     model.outputs = [model.layers[-1].output]
     model.layers[-1].outbound_nodes = []
-    model.add(Dense(output_dim=2, activation='sigmoid'))
+    model.add(Dense(output_dim=2, activation='linear'))
 
     #model.save_weights('ava_vgg_19_{0}.h5'.format(delta))
 
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
-    model.compile(loss='kullback_leibler_divergence', optimizer=sgd)
+    model.compile(loss=kullback_leibler_divergence, optimizer=sgd)
     model.fit(X_train, Y_train, nb_epoch=10,shuffle="batch")
 
 
