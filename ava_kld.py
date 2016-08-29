@@ -110,8 +110,11 @@ if __name__ == "__main__":
 
     Y_train = ava_table.ix[:,['score','standard_deviation']].as_matrix()
 
-   # Y_train[:,0] /= 10
-    #Y_train[:,1] -= 1
+    mean_max = np.max(Y_train[:,0])
+    Y_train[:,0] /= mean_max
+
+    sd_max = np.max(Y_train[:,1])
+    Y_train[:,1] /= sd_max
 
     #Y_train = ava_table.ix[:,['score']].as_matrix()
 
@@ -154,12 +157,12 @@ if __name__ == "__main__":
     model.layers.pop()
     model.outputs = [model.layers[-1].output]
     model.layers[-1].outbound_nodes = []
-    model.add(Dense(output_dim=2, activation='linear'))
+    model.add(Dense(output_dim=2, activation='sigmoid'))
 
     #model.save_weights('ava_vgg_19_{0}.h5'.format(delta))
 
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
-    model.compile(loss='mse', optimizer=sgd)
+    model.compile(loss=kullback_leibler_divergence, optimizer=sgd)
     model.fit(X_train, Y_train, nb_epoch=10,shuffle="batch")
 
 
