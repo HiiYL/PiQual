@@ -110,8 +110,8 @@ if __name__ == "__main__":
 
     Y_train = ava_table.ix[:,['score','standard_deviation']].as_matrix()
 
-    Y_train[:,0] /= 10
-    Y_train[:,1] -= 1
+   # Y_train[:,0] /= 10
+    #Y_train[:,1] -= 1
 
     #Y_train = ava_table.ix[:,['score']].as_matrix()
 
@@ -122,8 +122,8 @@ if __name__ == "__main__":
 
     Y_test = ava_test.ix[:,['score','standard_deviation']].as_matrix()
 
-    Y_test[:,0] /= 10
-    Y_test[:,1] -= 1
+    #Y_test[:,0] /= 10
+    #Y_test[:,1] -= 1
 
    # Y_test = ava_test.ix[:,['score']].as_matrix()
     # Y_test = ava_test.ix[:, "good"].as_matrix()
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     #model.save_weights('ava_vgg_19_{0}.h5'.format(delta))
 
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
-    model.compile(loss=kullback_leibler_divergence, optimizer=sgd)
+    model.compile(loss='mse', optimizer=sgd)
     model.fit(X_train, Y_train, nb_epoch=10,shuffle="batch")
 
 
