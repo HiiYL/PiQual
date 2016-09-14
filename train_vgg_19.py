@@ -128,9 +128,9 @@ if __name__ == "__main__":
     model.layers.pop()
     model.outputs = [model.layers[-1].output]
     model.layers[-1].outbound_nodes = []
-    model.add(Dense(output_dim=2, activation='softmax'))
+    model.add(Dense(output_dim=4096, activation='relu'))
 
-    model.save_weights('ava_vgg_19_{0}.h5'.format(delta))
+    #model.save_weights('ava_vgg_19_{0}.h5'.format(delta))
 
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])

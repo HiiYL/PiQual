@@ -46,3 +46,64 @@ for index, row in ava_table.iterrows():
 if invalid_indices:
     ava_table = ava_table.drop(invalid_indices)
     store['labels'] = ava_table
+
+
+
+###########preprocess comments
+ava_comment_path = "dataset/AVA-Comments/"
+ava_data_path = os.path.join(os.getcwd(), ava_comment_path)
+comments_series = pd.Series(index=ava_table.index)
+
+store = HDFStore('dataset_h5/labels.h5')
+
+labels_count = ava_table.shape[0]
+count=0
+for index, row in ava_table.iterrows():
+    if (count % 1000) == 0:
+        print('Now Processing Comments {0}/{1}'.format(count,labels_count))
+    filename = str(index) + ".txt"
+    filepath = os.path.join(ava_data_path, filename)
+    with open(filepath,encoding = "ISO-8859-1") as f:
+        content = f.readlines()
+        stripped_contents = [ string.strip() for string in content ]
+        comments_series.ix[index] = stripped_contents
+    count = count + 1
+ava_table.loc[:,'comments'] = comments_series
+
+
+import sys
+import numpy as np
+import gensim
+from word2veckeras.word2veckeras import Word2VecKeras
+
+def compare_w2v(w2v1,w2v2):
+    s=0.0
+    count =0
+    for w in w2v1.vocab:
+        if w in w2v2.vocab:
+            d=np.linalg.norm(w2v1[w]-w2v2[w])
+            count +=1
+            s += d
+    return s/count
+
+
+input_file = 'test.txt'
+sents=gensim.models.word2vec.LineSentence(input_file)
+
+v_iter=1
+v_size=5
+sg_v=1
+topn=4
+
+vs1 = gensim.models.word2vec.Word2Vec(sents,hs=1,negative=0,sg=sg_v,size=v_size,iter=1)
+                      
+print vs1['the']
+vsk1 = Word2VecKeras(sents,hs=1,negative=0,sg=sg_v,size=v_size,iter=1)
+print( vsk1.most_similar('the', topn=topn))
+print vsk1['the']
+print np.linalg.norm(vs1.syn0-vsk1.syn0),compare_w2v(vs1,vsk1)
+vsk1 = Word2VecKeras(sents,hs=1,negative=0,sg=sg_v,size=v_size,iter=5)
+print vsk1['the']
+print( vsk1.most_similar('the', topn=topn))
+print( vs1.most_similar('the', topn=topn))
+print np.linalg.norm(vs1.syn0-vsk1.syn0),compare_w2v(vs1,vsk1)

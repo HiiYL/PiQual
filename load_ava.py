@@ -124,13 +124,14 @@ if __name__ == "__main__":
 
 
 
-    model = VGG_19()
+    #model = VGG_19()
+    model = load_model('ava_vgg_19_1.0_5.h5')
 
     #odel = load_model(weights_path)
     
 
-    sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
-    model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+    # sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
+    # model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
     model.fit(X_train, Y_train, nb_epoch=10,shuffle="batch")
 
 
