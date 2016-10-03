@@ -219,13 +219,13 @@ def image_to_test():
     i=i+1
 
 
-def image_to_pickle():
-  delta = 1.0
+def image_to_hdf5():
+  delta = 0
 
   ava_path = "dataset/AVA/data/"
   ava_data_path = os.path.join(os.getcwd(), ava_path)
   store = HDFStore('dataset_h5/labels.h5')
-  ava_table = store['labels_train']
+  ava_table = store['labels']
   ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
 
 
@@ -242,18 +242,23 @@ def image_to_pickle():
 
   i=0
   invalid_indices = []
-  for index, row in ava_table.iterrows():
+  for index, row in ava_table.iloc[i:].iterrows():
     if(i >= periodNum):
       break
     if (i % 1000) == 0:
       print('Now Processing {0}/{1}'.format(i,periodNum))
     filename = str(index) + ".jpg"
     filepath = os.path.join(ava_data_path, filename)
-    image = ndimage.imread(filepath, mode="RGB")
-    image_resized = misc.imresize(image, (224, 224)).T
-    data[i] = np.expand_dims(image_resized,axis=0)
+    #image = ndimage.imread(filepath, mode="RGB")
+    #image_resized = misc.imresize(image, (224, 224)).T
+    im = cv2.resize(cv2.imread(filepath), (224,224))
+    im = im.transpose((2,0,1))
+
+    data[i] = im             #np.expand_dims(im,axis=0)
     i=i+1
 
 
+
+  #SKIPPED INDICES = 176139
   h5f.close()
   store.close()
