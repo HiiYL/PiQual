@@ -128,17 +128,19 @@ if __name__ == "__main__":
 
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,
                                           patience=0, min_lr=0, verbose=1)
-    hist = model.fit(X_train, Y_train, nb_epoch=20,shuffle="batch", callbacks=[reduce_lr])
+    history = model.fit(X_train, Y_train, nb_epoch=20,shuffle="batch", callbacks=[reduce_lr], validation_data=(X_test, Y_test))
 
 
     prediction = model.predict(X_test)
+
+    np.mean(np.square(prediction - Y_test))
 
     binary_pred = np.apply_along_axis(good, 1,prediction)
 
 
     Y_test_binary = ava_test.ix[:,"good"].as_matrix()
 
-    prediction_accuracy = np.mean(binary_pred == Y_test_binary[:,1])
+    prediction_accuracy = np.mean(binary_pred == Y_test_binary)
 
 
     model.save_weights('linear_ava_{0}.h5'.format(delta))
@@ -149,3 +151,21 @@ if __name__ == "__main__":
     print('Test accuracy:{0}'.format(score[1]))
     print()
     print("Predictions")
+
+
+def predict():
+  model = load_model('linear_1e5_full.h5')
+
+  directory = "/home/hii/Pictures/100ANDRO/"
+
+  rows_list = []
+  for filename in os.listdir(directory):
+    if filename.endswith(".png") or filename.endswith(".JPG"):
+      im = cv2.resize(cv2.imread(directory + filename), (224,224)).transpose((2,0,1))
+
+      im = np.expand_dims(im, axis=0)
+      rating = model.predict(im)[0][0]
+      file_rating_dict = {"filename": filename, "rating": rating}
+      rows_list.append(file_rating_dict)
+
+  df = pd.DataFrame(rows_list)
