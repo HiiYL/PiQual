@@ -68,7 +68,7 @@ def VGG_19_functional(weights_path=None):
 
 
     main_output = Dense(output_dim=1, name="main_output")(x)
-    aux_output = Dense(66, activation='sigmoid', name='aux_output')(x)
+    aux_output = Dense(65, activation='sigmoid', name='aux_output')(x)
 
     model = Model(input=inputs, output=[main_output,aux_output])
 
@@ -98,7 +98,12 @@ X_train = h5f['data']
 
 Y_train = ava_table.ix[:, "score"].as_matrix()
 
-Y_train_tag = to_categorical(ava_table.ix[:,10:12].as_matrix(), 66)
+
+## Observation: Category 66 - Analog is never used in the entire dataset
+## Can be tested with
+## np.max(ava_table.ix[:,10:12])
+
+Y_train_tag = to_categorical(ava_table.ix[:,10:12].as_matrix())[:,1:]
 
 
 # Y_train = to_categorical(Y_train, 2)
@@ -118,7 +123,7 @@ model = VGG_19_functional('named_vgg19_weights.h5')
 sgd = SGD(lr=1e-5, decay=5e-6, momentum=0.9, nesterov=True)
 model.compile(optimizer=sgd,
     loss={'main_output': 'mse', 'aux_output': 'categorical_crossentropy'},
-    loss_weights={'main_output': 1., 'aux_output': 0.5}
+    loss_weights={'main_output': 1., 'aux_output': 1.}
     )
 
 model.fit(X_train,
