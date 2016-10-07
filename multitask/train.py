@@ -67,8 +67,13 @@ def VGG_19_functional(weights_path=None):
     x = Dropout(0.5)(x)
 
 
-    main_output = Dense(output_dim=1, name="main_output")(x)
-    aux_output = Dense(65, activation='sigmoid', name='aux_output')(x)
+    m_x = Dense(4096, activation='relu',name='fc19')(x)
+    m_x = Dropout(0.5)(m_x)
+    main_output = Dense(output_dim=1, name="main_output")(m_x)
+
+    a_x = Dense(4096, activation='relu',name='fc20')(x)
+    a_x = Dropout(0.5)(a_x)
+    aux_output = Dense(65, activation='softmax', name='aux_output')(a_x)
 
     model = Model(input=inputs, output=[main_output,aux_output])
 
@@ -115,6 +120,7 @@ X_test = h5f_test['data_test']
 ava_test = store['labels_test']
 Y_test = ava_test.ix[:, "score"].as_matrix()
 
+Y_test_tag = to_categorical(ava_test.ix[:,10:12].as_matrix())[:,1:]
 
 
 
@@ -123,9 +129,11 @@ model = VGG_19_functional('named_vgg19_weights.h5')
 sgd = SGD(lr=1e-5, decay=5e-6, momentum=0.9, nesterov=True)
 model.compile(optimizer=sgd,
     loss={'main_output': 'mse', 'aux_output': 'categorical_crossentropy'},
-    loss_weights={'main_output': 1., 'aux_output': 1.}
+    loss_weights={'main_output': 1., 'aux_output': 0.015} # 1/M where M = 65
     )
 
 model.fit(X_train,
           {'main_output': Y_train, 'aux_output': Y_train_tag},
-          nb_epoch=20, batch_size=32, shuffle="batch")
+          nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, [Y_test,Y_test_tag]))
+
+model.evaluate(X_test[:25], [Y_test[:25], Y_test_tag[:25]])
