@@ -8,3 +8,8 @@ dataset/
 .DS_Store
 *.pkl
 *.npy
+
+__pycache__/
+
+video/frames/
+video/*.mp4

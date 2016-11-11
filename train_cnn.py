@@ -120,8 +120,6 @@ if __name__ == "__main__":
 
     #weights_path = os.path.join(os.getcwd(), "ava_vgg_19_1.5_5.h5")
 
-
-
     model = VGG_19('vgg19_weights.h5')
     #for layer in model.layers[:19]:
     #    layer.trainable = False
