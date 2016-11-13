@@ -15,38 +15,34 @@ from keras.models import load_model
 
 delta = 1.0
 store = HDFStore('dataset_h5/labels.h5')
-# delta = 1
-ava_table = store['labels_train']
 
+
+ava_table = store['labels_train']
 ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
-# X_train = np.hstack(X).reshape(10000,224,224,3)
-# X = pickle.load( open("images_224.p", "rb"))
+
+
 h5f = h5py.File('dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
 X_train = h5f['data']
-#X_train = np.hstack(X).reshape(3,224,224,16160).T
-
-#X_train = X_train.astype('float32')
-
 Y_train = ava_table.ix[:, "good"].as_matrix()
 # Y_train = to_categorical(Y_train, 2)
 
-
-
 h5f_test = h5py.File('dataset_h5/images_224.h5','r')
 X_test = h5f_test['data_test']
-ava_test = store['labels_test']
-Y_test = ava_test.ix[:, "good"].as_matrix()
+Y_test = store['labels_test'].ix[:, "good"].as_matrix()
 # Y_test = to_categorical(Y_test, 2)
 
 
-
+# Load CNN and output features from layer fc15 for train set
 model = load_model('ava_vgg_1.0_10.h5')
 model.pop()
 model.pop()
-out = model.predict(X_train) 
+out = model.predict(X_train)
 np.save("bottlenecked_features.npy",out)
+
+# Load CNN and output features from layer fc15 for test set
 out_test = model.predict(X_test) 
 np.save("bottlenecked_features_test.npy",out_test)
+
 
 out = np.load("bottlenecked_features.npy")
 out_test = np.load("bottlenecked_features_test.npy")
@@ -74,7 +70,6 @@ def train(features, labels):
     Y = labels
 
     clf = svm.LinearSVC()
-
     #clf = linear_model.SGDRegressor()
     clf.fit(X, Y)
 
