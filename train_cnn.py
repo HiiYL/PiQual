@@ -14,6 +14,7 @@ from keras.layers.core import Flatten, Dense, Dropout
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.utils.np_utils import to_categorical
 from keras.optimizers import SGD
+from keras.callbacks import CSVLogger
 
 
 def VGG_19(weights_path=None):
@@ -78,7 +79,7 @@ if __name__ == "__main__":
     # num_training = 9000
     # num_test = 1000
 
-    delta = 1.0
+    delta = 0.0
     store = HDFStore('dataset_h5/labels.h5')
     # delta = 1
     ava_table = store['labels_train']
@@ -87,7 +88,7 @@ if __name__ == "__main__":
     # X_train = np.hstack(X).reshape(10000,224,224,3)
     # X = pickle.load( open("images_224.p", "rb"))
     h5f = h5py.File('dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
-    X_train = h5f['data']
+    X_train = h5f['data_train']
     #X_train = np.hstack(X).reshape(3,224,224,16160).T
 
     #X_train = X_train.astype('float32')
@@ -95,10 +96,7 @@ if __name__ == "__main__":
     Y_train = ava_table.ix[:, "good"].as_matrix()
     Y_train = to_categorical(Y_train, 2)
 
-
-
-    h5f_test = h5py.File('dataset_h5/images_224.h5','r')
-    X_test = h5f_test['data_test']
+    X_test = h5f['data_test']
     ava_test = store['labels_test']
     Y_test = ava_test.ix[:, "good"].as_matrix()
     Y_test = to_categorical(Y_test, 2)
@@ -126,13 +124,17 @@ if __name__ == "__main__":
     model.layers.pop()
     model.outputs = [model.layers[-1].output]
     model.layers[-1].outbound_nodes = []
-    model.add(Dense(output_dim=4096, activation='relu'))
+    model.add(Dense(output_dim=2, activation='softmax'))
 
     #model.save_weights('ava_vgg_19_{0}.h5'.format(delta))
 
+
+
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
-    model.fit(X_train, Y_train, nb_epoch=10,shuffle="batch")
+
+    csv_logger = CSVLogger('training_cnn_binary_0.001.log')
+    model.fit(X_train, Y_train, nb_epoch=10,shuffle="batch",validation_data=(X_test, Y_test), callbacks=[csv_logger])
 
 
     model.save_weights(('ava_vgg_19_{0}.h5'.format(delta))

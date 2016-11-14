@@ -1,6 +1,9 @@
 dataset/
+dataset_h5/
 
 *.p
+*.pyc
+*.log
 
 *.h5
 
