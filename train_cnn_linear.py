@@ -225,7 +225,6 @@ if __name__ == "__main__":
 
     binary_pred = np.apply_along_axis(good, 1,prediction)
 
-
     Y_test_binary = ava_test.ix[:,"good"].as_matrix()
 
     prediction_accuracy = np.mean(binary_pred == Y_test_binary)
