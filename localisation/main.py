@@ -85,12 +85,32 @@ def VGG_19_GAP_functional(weights_path=None,heatmap=False):
 
     return model
 
+def process_image(image):
+    im = np.copy(original_img)
+    im[:,:,0] -= 103.939
+    im[:,:,1] -= 116.779
+    im[:,:,2] -= 123.68
+    im = im.transpose((2,0,1))
+    im = np.expand_dims(im, axis=0)
+    return im
+
+def deprocess_image(image):
+    im = np.copy(image)
+    im[:,:,0] += 103.939
+    im[:,:,1] += 116.779
+    im[:,:,2] += 123.
+
+    im = im.transpose((1,2,0))
+
+    return im
+
+
 if __name__ == "__main__":
 
 
 
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
-    model = VGG_19_GAP_functional(weights_path='aesthestic_gap_weights_1.h5',heatmap=True)
+    model = VGG_19_GAP_functional(weights_path='aesthestic_gap_weights_1.h5',heatmap=False)
 
     # model.compile(optimizer=sgd, loss='mse')
 
@@ -118,7 +138,10 @@ if __name__ == "__main__":
     Y_test = to_categorical(Y_test, 2)
 
 
-    model.compile(optimizer=sgd,loss='categorical_crossentropy')
+    model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
+
+
+
 
     csv_logger = CSVLogger('training_gap_binary.log')
 
@@ -126,52 +149,48 @@ if __name__ == "__main__":
     #    nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger])
 
 
-    image_path = "highasfuck.png"
+    # image_path = "highasfuck.png"
 
-    original_img = cv2.imread(image_path).astype(np.float32)
+    # original_img = cv2.imread(image_path).astype(np.float32)
 
-    width, height, _ = original_img.shape
+    # width, height, _ = original_img.shape
 
-    im = np.copy(original_img)
-    im[:,:,0] -= 103.939
-    im[:,:,1] -= 116.779
-    im[:,:,2] -= 123.68
-    im = im.transpose((2,0,1))
-    im = np.expand_dims(im, axis=0)
+    # im = process_image(original_img)
 
-
-    out = model.predict(im)
+    results = model.evaluate(X_test,Y_test)
 
 
 
-    output_path = "output-" + image_path
-    #Get the 512 input weights to the softmax.
-    class_weights = model.layers[-1].get_weights()[0]
-    # final_conv_layer = get_output_layer(model, "conv5_3")
-    # get_output = K.function([model.layers[0].input], [final_conv_layer.output, model.layers[-1].output])
-    # [conv_outputs, predictions] = get_output([im])
-    # conv_outputs = conv_outputs[0, :, :, :]
 
-    out[1] = out[1][0,:,:,:]
+    # 
 
-    #Create the class activation map.
-    cam = np.zeros(dtype = np.float32, shape = out[1].shape[1:3])
+    ava_path = "../dataset/AVA/data/"
 
-    class_to_visualize = 1 # 0 for bad, 1 for good
-    for i, w in enumerate(class_weights[:, class_to_visualize]):
-            cam += w * out[1][i, :, :]
-    print("predictions", out[0])
-    cam /= np.max(cam)
-    cam = cv2.resize(cam, (height, width))
-    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-    heatmap[np.where(cam < 0.2)] = 0
-    im = heatmap*0.5 + original_img
-    cv2.imwrite(output_path, im)
-    # heatmap = out[0,:,:].sum(axis=0)
+    for index in ava_test.iloc[:25].index:
+        image_name = str(index) + ".jpg"
+        original_img = cv2.imread(ava_path + image_name).astype(np.float32)
 
-    # im = plt.imread('kitten.jpg')
-    # implot = plt.imshow(im)
+        width, height, _ = original_img.shape
 
+        im = process_image(original_img)
+        out = model.predict(im)
+        output_path = "output/" + image_name
 
-    # plt.imshow(heatmap, cmap='hot', interpolation='bilinear',alpha=0.7,aspect='auto',extent=[0,im.shape[1],im.shape[0],0])
-    # plt.show()
+        
+        class_weights = model.layers[-1].get_weights()[0]
+
+        out[1] = out[1][0,:,:,:]
+
+        #Create the class activation map.
+        cam = np.zeros(dtype = np.float32, shape = out[1].shape[1:3])
+
+        class_to_visualize = 1 # 0 for bad, 1 for good
+        for i, w in enumerate(class_weights[:, class_to_visualize]):
+                cam += w * out[1][i, :, :]
+        print("predictions", out[0])
+        cam /= np.max(cam)
+        cam = cv2.resize(cam, (height, width))
+        heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+        heatmap[np.where(cam < 0.4)] = 0
+        im = heatmap*0.5 + original_img
+        cv2.imwrite(output_path, im)
