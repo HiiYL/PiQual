@@ -87,25 +87,16 @@ def VGG_19_GAP_functional(weights_path=None,heatmap=False):
 
 if __name__ == "__main__":
 
-    original_img = cv2.imread('kitten.jpg').astype(np.float32)
 
-    width, height, _ = original_img.shape
-
-    im = np.copy(original_img)
-    im[:,:,0] -= 103.939
-    im[:,:,1] -= 116.779
-    im[:,:,2] -= 123.68
-    im = im.transpose((2,0,1))
-    im = np.expand_dims(im, axis=0)
 
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
-    model = VGG_19_GAP_functional(weights_path='../binary_cnn_10_named_weights.h5')
+    model = VGG_19_GAP_functional(weights_path='aesthestic_gap_weights_1.h5',heatmap=True)
 
     # model.compile(optimizer=sgd, loss='mse')
 
 
     delta = 0.0
-    store = HDFStore('../dataset_h5/labels.h5')
+    store = HDFStore('../dataset_h5/labels.h5','r')
     # delta = 1
     ava_table = store['labels_train']
 
@@ -131,17 +122,29 @@ if __name__ == "__main__":
 
     csv_logger = CSVLogger('training_gap_binary.log')
 
-    model.fit(X_train,Y_train,
-        nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger])
+    #model.fit(X_train,Y_train,
+    #    nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger])
 
 
+    image_path = "highasfuck.png"
+
+    original_img = cv2.imread(image_path).astype(np.float32)
+
+    width, height, _ = original_img.shape
+
+    im = np.copy(original_img)
+    im[:,:,0] -= 103.939
+    im[:,:,1] -= 116.779
+    im[:,:,2] -= 123.68
+    im = im.transpose((2,0,1))
+    im = np.expand_dims(im, axis=0)
 
 
     out = model.predict(im)
 
-    output_path = "output_1.jpg"
 
 
+    output_path = "output-" + image_path
     #Get the 512 input weights to the softmax.
     class_weights = model.layers[-1].get_weights()[0]
     # final_conv_layer = get_output_layer(model, "conv5_3")
