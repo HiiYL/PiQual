@@ -6,11 +6,21 @@ from keras.models import Model
 from keras import backend as K
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.layers.pooling import GlobalAveragePooling2D
+from keras.utils.np_utils import to_categorical
+from keras.callbacks import CSVLogger
 
 import cv2
 
-import matplotlib.pyplot as plt
+from scipy import ndimage, misc
+import cv2
 import numpy as np
+import os
+import pickle
+import pandas as pd
+from pandas import HDFStore, DataFrame
+
+import h5py
+import matplotlib.pyplot as plt
 
 def VGG_19_GAP_functional(weights_path=None,heatmap=False):
 
@@ -61,27 +71,21 @@ def VGG_19_GAP_functional(weights_path=None,heatmap=False):
 
     x = GlobalAveragePooling2D()(final_conv)
 
-    main_output = Dense(2, activation = 'softmax', init='uniform', name="main_output")(x)
+    main_output = Dense(2, activation = 'softmax', name="main_output")(x)
     aux_output = final_conv
 
-    model = Model(input=inputs, output=[main_output,aux_output])
+
+    if heatmap:
+        model = Model(input=inputs, output=[main_output,aux_output])
+    else:
+        model = Model(input=inputs, output=main_output)#[main_output,aux_output])
 
     if weights_path:
         model.load_weights(weights_path,by_name=True)
 
     return model
-    
+
 if __name__ == "__main__":
-    # ### Here is a script to compute the heatmap of the dog synsets.
-    # ## We find the synsets corresponding to dogs on ImageNet website
-    # s = "n02084071"
-    # ids = synset_to_dfs_ids(s)
-    # # Most of the synsets are not in the subset of the synsets used in ImageNet recognition task.
-    # ids = np.array([id_ for id_ in ids if id_ is not None])
-
-    # im = preprocess_image_batch(['examples/dog.jpg'], color_mode="rgb")
-
-    # Test pretrained model
 
     original_img = cv2.imread('kitten.jpg').astype(np.float32)
 
@@ -94,18 +98,48 @@ if __name__ == "__main__":
     im = im.transpose((2,0,1))
     im = np.expand_dims(im, axis=0)
 
-    sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
     model = VGG_19_GAP_functional(weights_path='../binary_cnn_10_named_weights.h5')
 
+    # model.compile(optimizer=sgd, loss='mse')
 
 
-    model.compile(optimizer=sgd, loss='mse')
+    delta = 0.0
+    store = HDFStore('../dataset_h5/labels.h5')
+    # delta = 1
+    ava_table = store['labels_train']
+
+    ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
+    # X_train = np.hstack(X).reshape(10000,224,224,3)
+    # X = pickle.load( open("images_224.p", "rb"))
+    h5f = h5py.File('../dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
+    X_train = h5f['data_train']
+    #X_train = np.hstack(X).reshape(3,224,224,16160).T
+
+    #X_train = X_train.astype('float32')
+
+    Y_train = ava_table.ix[:, "good"].as_matrix()
+    Y_train = to_categorical(Y_train, 2)
+
+    X_test = h5f['data_test']
+    ava_test = store['labels_test']
+    Y_test = ava_test.ix[:, "good"].as_matrix()
+    Y_test = to_categorical(Y_test, 2)
+
+
+    model.compile(optimizer=sgd,loss='categorical_crossentropy')
+
+    csv_logger = CSVLogger('training_gap_binary.log')
+
+    model.fit(X_train,Y_train,
+        nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger])
+
+
+
 
     out = model.predict(im)
 
-    print(out.shape)
-
-    output_path = "output.jpg"
+    output_path = "output_1.jpg"
 
 
     #Get the 512 input weights to the softmax.
@@ -119,7 +153,9 @@ if __name__ == "__main__":
 
     #Create the class activation map.
     cam = np.zeros(dtype = np.float32, shape = out[1].shape[1:3])
-    for i, w in enumerate(class_weights[:, 1]):
+
+    class_to_visualize = 1 # 0 for bad, 1 for good
+    for i, w in enumerate(class_weights[:, class_to_visualize]):
             cam += w * out[1][i, :, :]
     print("predictions", out[0])
     cam /= np.max(cam)

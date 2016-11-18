@@ -16,3 +16,5 @@ __pycache__/
 
 video/frames/
 video/*.mp4
+
+*.jpg

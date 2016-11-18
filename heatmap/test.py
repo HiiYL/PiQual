@@ -3,42 +3,27 @@ from keras.models import Sequential
 from keras.layers import Dense, Activation
 from keras.layers.core import Flatten, Dense, Dropout
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
+from keras.layers.pooling import GlobalAveragePooling2D
 
-from keras.engine import Layer
-from keras import backend as K
+import cv2
 
-class Softmax4D(Layer):
-    def __init__(self, axis=-1,**kwargs):
-        self.axis=axis
-        super(Softmax4D, self).__init__(**kwargs)
+import matplotlib.pyplot as plt
+import numpy as np
 
-    def build(self,input_shape):
-        pass
-
-    def call(self, x,mask=None):
-        e = K.exp(x - K.max(x, axis=self.axis, keepdims=True))
-        s = K.sum(e, axis=self.axis, keepdims=True)
-        return e / s
-
-    def get_output_shape_for(self, input_shape):
-        return input_shape
 def VGG_19(weights_path=None,heatmap=False):
     model = Sequential()
 
-    if heatmap:
-        model.add(ZeroPadding2D((1,1),input_shape=(3,None,None)))
-    else:
-        model.add(ZeroPadding2D((1,1),input_shape=(3,224,224)))
+    model.add(ZeroPadding2D((1,1),input_shape=(3,224,224)))
     model.add(Convolution2D(64, 3, 3, activation='relu', name='conv1_1'))
     model.add(ZeroPadding2D((1,1)))
     model.add(Convolution2D(64, 3, 3, activation='relu', name='conv1_2'))
-    model.add(MaxPooling2D((2,2), strides=(2,2)))
+    #model.add(MaxPooling2D((2,2), strides=(2,2)))
 
     model.add(ZeroPadding2D((1,1)))
     model.add(Convolution2D(128, 3, 3, activation='relu', name='conv2_1'))
     model.add(ZeroPadding2D((1,1)))
     model.add(Convolution2D(128, 3, 3, activation='relu', name='conv2_2'))
-    model.add(MaxPooling2D((2,2), strides=(2,2)))
+    #model.add(MaxPooling2D((2,2), strides=(2,2)))
 
     model.add(ZeroPadding2D((1,1)))
     model.add(Convolution2D(256, 3, 3, activation='relu', name='conv3_1'))
@@ -48,7 +33,7 @@ def VGG_19(weights_path=None,heatmap=False):
     model.add(Convolution2D(256, 3, 3, activation='relu', name='conv3_3'))
     model.add(ZeroPadding2D((1,1)))
     model.add(Convolution2D(256, 3, 3, activation='relu', name='conv3_4'))
-    model.add(MaxPooling2D((2,2), strides=(2,2)))
+    #model.add(MaxPooling2D((2,2), strides=(2,2)))
 
     model.add(ZeroPadding2D((1,1)))
     model.add(Convolution2D(512, 3, 3, activation='relu', name='conv4_1'))
@@ -58,7 +43,7 @@ def VGG_19(weights_path=None,heatmap=False):
     model.add(Convolution2D(512, 3, 3, activation='relu', name='conv4_3'))
     model.add(ZeroPadding2D((1,1)))
     model.add(Convolution2D(512, 3, 3, activation='relu', name='conv4_4'))
-    model.add(MaxPooling2D((2,2), strides=(2,2)))
+    #model.add(MaxPooling2D((2,2), strides=(2,2)))
 
     model.add(ZeroPadding2D((1,1)))
     model.add(Convolution2D(512, 3, 3, activation='relu', name='conv5_1'))
@@ -68,21 +53,10 @@ def VGG_19(weights_path=None,heatmap=False):
     model.add(Convolution2D(512, 3, 3, activation='relu', name='conv5_3'))
     model.add(ZeroPadding2D((1,1)))
     model.add(Convolution2D(512, 3, 3, activation='relu', name='conv5_4'))
-    model.add(MaxPooling2D((2,2), strides=(2,2)))
+    # model.add(MaxPooling2D((2,2), strides=(2,2)))
 
-    if heatmap:
-        model.add(Convolution2D(4096,7,7,activation="relu",name="fc17"))
-        model.add(Convolution2D(4096,1,1,activation="relu",name="fc18"))
-        model.add(Convolution2D(1000,1,1,name="dense_3"))
-        model.add(Softmax4D(axis=1,name="softmax"))
-    else:
-        model.add(Flatten())
-        model.add(Dense(4096, activation='relu', name='fc17'))
-        model.add(Dropout(0.5))
-        model.add(Dense(4096, activation='relu', name='fc18'))
-        model.add(Dropout(0.5))
-        model.add(Dense(1000, name='dense_3'))
-        model.add(Activation("softmax"))
+    model.add(ZeroPadding2D((1,1)))
+    model.add(Convolution2D(1024, 3, 3, activation='relu',name='conv6_1'))
 
     if weights_path:
         model.load_weights(weights_path,by_name=True)
@@ -100,9 +74,24 @@ if __name__ == "__main__":
     # im = preprocess_image_batch(['examples/dog.jpg'], color_mode="rgb")
 
     # Test pretrained model
+
+    im = cv2.resize(cv2.imread('tazeek-punch.jpg'), (224, 224)).astype(np.float32)
+    im[:,:,0] -= 103.939
+    im[:,:,1] -= 116.779
+    im[:,:,2] -= 123.68
+    im = im.transpose((2,0,1))
+    im = np.expand_dims(im, axis=0)
+
     sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
-    model = VGG_19(weights_path='../binary_cnn_10_named_weights.h5', heatmap=True)
+    model = VGG_19(weights_path='../binary_cnn_10_named_weights.h5')
     model.compile(optimizer=sgd, loss='mse')
 
     out = model.predict(im)
-    heatmap = out[0,ids,:,:].sum(axis=0)
+    heatmap = out[0,:,:].sum(axis=0)
+
+    im = plt.imread('tazeek-punch.jpg')
+    implot = plt.imshow(im)
+
+
+    plt.imshow(heatmap, cmap='hot', interpolation='bilinear',alpha=0.7,aspect='auto',extent=[0,im.shape[1],im.shape[0],0])
+    plt.show()

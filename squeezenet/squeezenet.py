@@ -37,7 +37,7 @@ def get_squeezenet(nb_classes, dim_ordering='tf'):
     if dim_ordering is 'th':
         input_img = Input(shape=(3, 224, 224))
     elif dim_ordering is 'tf':
-        input_img = Input(shape=(224, 224, 3))
+        input_img = Input(shape=(3, 224, 224))
     else:
         raise NotImplementedError("Theano and Tensorflow are only available")
     x = Convolution2D(64, 3, 3, subsample=(2, 2), border_mode='valid', name='conv1')(input_img)
