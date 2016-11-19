@@ -29,13 +29,13 @@ def VGG_19_GAP_functional(weights_path=None,heatmap=False):
     x = Convolution2D(64, 3, 3, activation='relu',border_mode='same',name='conv1_1')(inputs)
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(64, 3, 3, activation='relu',name='conv1_2')(x)
-    x = MaxPooling2D((2,2), strides=(2,2))(x)
+    # x = MaxPooling2D((2,2), strides=(2,2))(x)
 
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(128, 3, 3, activation='relu',name='conv2_1')(x)
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(128, 3, 3, activation='relu',name='conv2_2')(x)
-    x = MaxPooling2D((2,2), strides=(2,2))(x)
+    # x = MaxPooling2D((2,2), strides=(2,2))(x)
 
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(256, 3, 3, activation='relu',name='conv3_1')(x)
@@ -45,7 +45,7 @@ def VGG_19_GAP_functional(weights_path=None,heatmap=False):
     x = Convolution2D(256, 3, 3, activation='relu',name='conv3_3')(x)
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(256, 3, 3, activation='relu',name='conv3_4')(x)
-    x = MaxPooling2D((2,2), strides=(2,2))(x)
+    # x = MaxPooling2D((2,2), strides=(2,2))(x)
 
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(512, 3, 3, activation='relu',name='conv4_1')(x)
@@ -55,7 +55,7 @@ def VGG_19_GAP_functional(weights_path=None,heatmap=False):
     x = Convolution2D(512, 3, 3, activation='relu',name='conv4_3')(x)
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(512, 3, 3, activation='relu',name='conv4_4')(x)
-    x = MaxPooling2D((2,2), strides=(2,2))(x)
+    # x = MaxPooling2D((2,2), strides=(2,2))(x)
 
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(512, 3, 3, activation='relu',name='conv5_1')(x)
@@ -109,8 +109,8 @@ if __name__ == "__main__":
 
 
 
-    sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
-    model = VGG_19_GAP_functional(weights_path='aesthestic_gap_weights_1.h5',heatmap=False)
+    
+    model = VGG_19_GAP_functional(weights_path='aesthestic_gap_weights_1.h5',heatmap=True)
 
     # model.compile(optimizer=sgd, loss='mse')
 
@@ -138,6 +138,7 @@ if __name__ == "__main__":
     Y_test = to_categorical(Y_test, 2)
 
 
+    sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
     model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
 
 
@@ -157,7 +158,7 @@ if __name__ == "__main__":
 
     # im = process_image(original_img)
 
-    results = model.evaluate(X_test,Y_test)
+    # results = model.evaluate(X_test,Y_test)
 
 
 
@@ -166,7 +167,7 @@ if __name__ == "__main__":
 
     ava_path = "../dataset/AVA/data/"
 
-    for index in ava_test.iloc[:25].index:
+    for index in ava_test.iloc[::-1][:100].index:
         image_name = str(index) + ".jpg"
         original_img = cv2.imread(ava_path + image_name).astype(np.float32)
 
@@ -176,7 +177,7 @@ if __name__ == "__main__":
         out = model.predict(im)
         output_path = "output/" + image_name
 
-        
+
         class_weights = model.layers[-1].get_weights()[0]
 
         out[1] = out[1][0,:,:,:]
@@ -191,6 +192,6 @@ if __name__ == "__main__":
         cam /= np.max(cam)
         cam = cv2.resize(cam, (height, width))
         heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-        heatmap[np.where(cam < 0.4)] = 0
+        heatmap[np.where(cam < 0.2)] = 0
         im = heatmap*0.5 + original_img
         cv2.imwrite(output_path, im)
