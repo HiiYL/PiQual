@@ -29,13 +29,13 @@ def VGG_19_GAP_functional(weights_path=None,heatmap=False):
     x = Convolution2D(64, 3, 3, activation='relu',border_mode='same',name='conv1_1')(inputs)
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(64, 3, 3, activation='relu',name='conv1_2')(x)
-    # x = MaxPooling2D((2,2), strides=(2,2))(x)
+    x = MaxPooling2D((2,2), strides=(2,2))(x)
 
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(128, 3, 3, activation='relu',name='conv2_1')(x)
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(128, 3, 3, activation='relu',name='conv2_2')(x)
-    # x = MaxPooling2D((2,2), strides=(2,2))(x)
+    x = MaxPooling2D((2,2), strides=(2,2))(x)
 
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(256, 3, 3, activation='relu',name='conv3_1')(x)
@@ -45,7 +45,7 @@ def VGG_19_GAP_functional(weights_path=None,heatmap=False):
     x = Convolution2D(256, 3, 3, activation='relu',name='conv3_3')(x)
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(256, 3, 3, activation='relu',name='conv3_4')(x)
-    # x = MaxPooling2D((2,2), strides=(2,2))(x)
+    x = MaxPooling2D((2,2), strides=(2,2))(x)
 
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(512, 3, 3, activation='relu',name='conv4_1')(x)
@@ -55,7 +55,7 @@ def VGG_19_GAP_functional(weights_path=None,heatmap=False):
     x = Convolution2D(512, 3, 3, activation='relu',name='conv4_3')(x)
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(512, 3, 3, activation='relu',name='conv4_4')(x)
-    # x = MaxPooling2D((2,2), strides=(2,2))(x)
+    x = MaxPooling2D((2,2), strides=(2,2))(x)
 
     x = ZeroPadding2D((1,1))(x)
     x = Convolution2D(512, 3, 3, activation='relu',name='conv5_1')(x)
@@ -86,7 +86,7 @@ def VGG_19_GAP_functional(weights_path=None,heatmap=False):
     return model
 
 def process_image(image):
-    im = np.copy(original_img)
+    im = np.copy(image)
     im[:,:,0] -= 103.939
     im[:,:,1] -= 116.779
     im[:,:,2] -= 123.68
@@ -104,16 +104,36 @@ def deprocess_image(image):
 
     return im
 
+def read_and_generate_heatmap(input_path, output_path):
+    original_img = cv2.imread(input_path).astype(np.float32)
+
+    width, height, _ = original_img.shape
+
+    im = process_image(original_img)
+    out = model.predict(im)
+
+    class_weights = model.layers[-1].get_weights()[0]
+
+    out[1] = out[1][0,:,:,:]
+
+    #Create the class activation map.
+    cam = np.zeros(dtype = np.float32, shape = out[1].shape[1:3])
+
+    class_to_visualize = 1 # 0 for bad, 1 for good
+    for i, w in enumerate(class_weights[:, class_to_visualize]):
+            cam += w * out[1][i, :, :]
+    print("predictions", out[0])
+    cam /= np.max(cam)
+    cam = cv2.resize(cam, (height, width))
+    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+    heatmap[np.where(cam < 0.2)] = 0
+    im = heatmap*0.5 + original_img
+    cv2.imwrite(output_path, im)
+
 
 if __name__ == "__main__":
-
-
-
     
     model = VGG_19_GAP_functional(weights_path='aesthestic_gap_weights_1.h5',heatmap=True)
-
-    # model.compile(optimizer=sgd, loss='mse')
-
 
     delta = 0.0
     store = HDFStore('../dataset_h5/labels.h5','r')
@@ -141,9 +161,6 @@ if __name__ == "__main__":
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
     model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
 
-
-
-
     csv_logger = CSVLogger('training_gap_binary.log')
 
     #model.fit(X_train,Y_train,
@@ -160,38 +177,11 @@ if __name__ == "__main__":
 
     # results = model.evaluate(X_test,Y_test)
 
-
-
-
-    # 
-
     ava_path = "../dataset/AVA/data/"
 
-    for index in ava_test.iloc[::-1][:100].index:
+    for index in ava_test.iloc[::-1][:25].index:
         image_name = str(index) + ".jpg"
-        original_img = cv2.imread(ava_path + image_name).astype(np.float32)
-
-        width, height, _ = original_img.shape
-
-        im = process_image(original_img)
-        out = model.predict(im)
+        input_path = ava_path + image_name
         output_path = "output/" + image_name
+        read_and_generate_heatmap(input_path, output_path)
 
-
-        class_weights = model.layers[-1].get_weights()[0]
-
-        out[1] = out[1][0,:,:,:]
-
-        #Create the class activation map.
-        cam = np.zeros(dtype = np.float32, shape = out[1].shape[1:3])
-
-        class_to_visualize = 1 # 0 for bad, 1 for good
-        for i, w in enumerate(class_weights[:, class_to_visualize]):
-                cam += w * out[1][i, :, :]
-        print("predictions", out[0])
-        cam /= np.max(cam)
-        cam = cv2.resize(cam, (height, width))
-        heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-        heatmap[np.where(cam < 0.2)] = 0
-        im = heatmap*0.5 + original_img
-        cv2.imwrite(output_path, im)
