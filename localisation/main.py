@@ -26,48 +26,32 @@ def VGG_19_GAP_functional(weights_path=None,heatmap=False):
 
     inputs = Input(shape=(3, None, None))
 
-    x = Convolution2D(64, 3, 3, activation='relu',border_mode='same',name='conv1_1')(inputs)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(64, 3, 3, activation='relu',name='conv1_2')(x)
-    x = MaxPooling2D((2,2), strides=(2,2))(x)
+    x = Convolution2D(64, 3, 3, activation='relu',name='conv1_1',border_mode ='same')(inputs)
+    x = Convolution2D(64, 3, 3, activation='relu',name='conv1_2',border_mode = 'same')(x)
+    x = MaxPooling2D((2,2), strides=(2,2), dim_ordering="th")(x)
 
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(128, 3, 3, activation='relu',name='conv2_1')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(128, 3, 3, activation='relu',name='conv2_2')(x)
-    x = MaxPooling2D((2,2), strides=(2,2))(x)
+    x = Convolution2D(128, 3, 3, activation='relu',name='conv2_1',border_mode = 'same')(x)
+    x = Convolution2D(128, 3, 3, activation='relu',name='conv2_2',border_mode = 'same')(x)
+    x = MaxPooling2D((2,2), strides=(2,2), dim_ordering="th")(x)
 
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_1')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_2')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_3')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_4')(x)
-    x = MaxPooling2D((2,2), strides=(2,2))(x)
+    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_1',border_mode = 'same')(x)
+    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_2',border_mode = 'same')(x)
+    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_3',border_mode = 'same')(x)
+    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_4',border_mode = 'same')(x)
+    x = MaxPooling2D((2,2), strides=(2,2), dim_ordering="th")(x)
 
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_1')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_2')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_3')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_4')(x)
-    x = MaxPooling2D((2,2), strides=(2,2))(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_1',border_mode = 'same')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_2',border_mode = 'same')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_3',border_mode = 'same')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_4',border_mode = 'same')(x)
+    x = MaxPooling2D((2,2), strides=(2,2), dim_ordering="th")(x)
 
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_1')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_2')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_3')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_4')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_1',border_mode = 'same')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_2',border_mode = 'same')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_3',border_mode = 'same')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_4',border_mode = 'same')(x)
 
-    x = ZeroPadding2D((1,1))(x)
-    final_conv = Convolution2D(1024, 3, 3, activation='relu',name='conv6_1')(x)
+    final_conv = Convolution2D(1024, 3, 3, activation='relu',name='conv6_1',border_mode = 'same')(x)
 
     x = GlobalAveragePooling2D()(final_conv)
 
@@ -109,7 +93,7 @@ def read_and_generate_heatmap(input_path, output_path):
 
     width, height, _ = original_img.shape
 
-    im = process_image(original_img)
+    im = process_image(cv2.resize(original_img,(224,224)))
     out = model.predict(im)
 
     class_weights = model.layers[-1].get_weights()[0]
@@ -167,16 +151,6 @@ if __name__ == "__main__":
     #    nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger])
 
 
-    # image_path = "highasfuck.png"
-
-    # original_img = cv2.imread(image_path).astype(np.float32)
-
-    # width, height, _ = original_img.shape
-
-    # im = process_image(original_img)
-
-    # results = model.evaluate(X_test,Y_test)
-
     ava_path = "../dataset/AVA/data/"
 
     for index in ava_test.iloc[::-1][:25].index:
@@ -184,4 +158,12 @@ if __name__ == "__main__":
         input_path = ava_path + image_name
         output_path = "output/" + image_name
         read_and_generate_heatmap(input_path, output_path)
+
+
+    saliency_benchmark_dir = "MITSalBenchmark/"
+    output_dir = "MITSalBenchmark/output/"
+    for file in os.listdir(saliency_benchmark_dir):
+        read_and_generate_heatmap(saliency_benchmark_dir + file, output_dir + file)
+
+
 
