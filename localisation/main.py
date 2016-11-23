@@ -51,8 +51,9 @@ def VGG_19_GAP_functional(weights_path=None,heatmap=False):
     x = Convolution2D(512, 3, 3, activation='relu',name='conv5_3',border_mode = 'same')(x)
     x = Convolution2D(512, 3, 3, activation='relu',name='conv5_4',border_mode = 'same')(x)
 
-    conv_output = Convolution2D(1024, 3, 3, activation='relu',name='conv6_1',border_mode = 'same')(x)
-    x = GlobalAveragePooling2D()(conv_out)
+    final_conv = Convolution2D(1024, 3, 3, activation='relu',name='conv6_1',border_mode = 'same')(x)
+
+    x = GlobalAveragePooling2D()(final_conv)
 
     main_output = Dense(2, activation = 'softmax', name="main_output")(x)
 
@@ -90,7 +91,7 @@ def read_and_generate_heatmap(input_path, output_path):
 
     width, height, _ = original_img.shape
 
-    im = process_image(original_img)
+    im = process_image(cv2.resize(original_img,(224,224)))
     out = model.predict(im)
 
     class_weights = model.layers[-1].get_weights()[0]
@@ -147,16 +148,6 @@ if __name__ == "__main__":
     #    nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger])
 
 
-    # image_path = "highasfuck.png"
-
-    # original_img = cv2.imread(image_path).astype(np.float32)
-
-    # width, height, _ = original_img.shape
-
-    # im = process_image(original_img)
-
-    # results = model.evaluate(X_test,Y_test)
-
     ava_path = "../dataset/AVA/data/"
 
     for index in ava_test.iloc[::-1][:1].index:
@@ -164,4 +155,12 @@ if __name__ == "__main__":
         input_path = ava_path + image_name
         output_path = "output/" + image_name
         read_and_generate_heatmap(input_path, output_path)
+
+
+    saliency_benchmark_dir = "MITSalBenchmark/"
+    output_dir = "MITSalBenchmark/output/"
+    for file in os.listdir(saliency_benchmark_dir):
+        read_and_generate_heatmap(saliency_benchmark_dir + file, output_dir + file)
+
+
 

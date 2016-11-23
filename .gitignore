@@ -18,5 +18,6 @@ video/frames/
 video/*.mp4
 
 *.jpg
-
 *.png
+
+*.zip
