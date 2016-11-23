@@ -20,15 +20,50 @@ def copyTestSet(dest_dir="test_images/"):
     i=i+1
 
 
-
+import cv2
+import numpy as np
+from decimal import *
 def computeAspectRatio():
   store = HDFStore('dataset_h5/labels.h5')
   ava_table = store['labels_train']
-  aspect_ratio_list = []
+
+
+  ava_path = "dataset/AVA/data/"
+
+  ava_data_path = os.path.join(os.getcwd(), ava_path)
+
+  periodNum = ava_table.shape[0]
+
+  getcontext().prec = 1
+
+  aspect_ratio_list = np.empty(periodNum, dtype=np.float16)
+  i = 0
   for index in ava_table.index:
     if (i % 1000) == 0:
       print('Now Processing {0}/{1}'.format(i,periodNum))
     filename = str(index) + ".jpg"
-    filepath = os.path.join(self.ava_data_path, filename)
+    filepath = os.path.join(ava_data_path, filename)
     height, width, channels = cv2.imread(filepath).shape
-    aspect_ratio = float("{0:.2f}".format(height/width)
+    aspect_ratio = Decimal(height) / Decimal(weight)
+    aspect_ratio_list[i] = aspect_ratio
+    i = i + 1
+
+  ava_table.loc[:, "aspect_ratio"] = aspect_ratio_list
+
+
+  ava_test = store['labels_test']
+
+  periodNum = ava_test.shape[0]
+
+  aspect_ratio_list = np.empty(periodNum, dtype=np.float16)
+  i = 0
+  for index in ava_test.index:
+    if (i % 1000) == 0:
+      print('Now Processing {0}/{1}'.format(i,periodNum))
+    filename = str(index) + ".jpg"
+    filepath = os.path.join(ava_data_path, filename)
+    height, width, channels = cv2.imread(filepath).shape
+    aspect_ratio = float("{0:.2f}".format(height/width))
+    aspect_ratio_list[i] = aspect_ratio
+    i = i + 1
+  ava_test[:, "aspect_ratio"] = aspect_ratio_list
