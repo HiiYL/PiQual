@@ -1,12 +1,11 @@
 from keras.applications.resnet50 import ResNet50
-from keras.callbacks import ModelCheckpoint
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 
 from keras.layers import Dense, Activation
 from keras.models import Model
 
 from keras.utils.np_utils import to_categorical
-from keras.callbacks import CSVLogger, ReduceLROnPlateau
+from keras.callbacks import CSVLogger, ReduceLROnPlateau,ModelCheckpoint
 
 from keras.layers.pooling import GlobalAveragePooling2D
 

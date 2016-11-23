@@ -7,7 +7,8 @@ from keras import backend as K
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.layers.pooling import GlobalAveragePooling2D
 from keras.utils.np_utils import to_categorical
-from keras.callbacks import CSVLogger
+
+from keras.callbacks import CSVLogger, ReduceLROnPlateau,ModelCheckpoint
 
 import cv2
 
@@ -115,7 +116,7 @@ def read_and_generate_heatmap(input_path, output_path):
 
 if __name__ == "__main__":
     
-    model = VGG_19_GAP_functional(weights_path='../aesthestic_gap_weights_1_tensorflow.h5',heatmap=True)
+    model = VGG_19_GAP_functional(weights_path='aesthestic_gap_weights_1_tensorflow.h5',heatmap=False)
 
     delta = 0.0
     store = HDFStore('../dataset_h5/labels.h5','r')
@@ -125,27 +126,32 @@ if __name__ == "__main__":
     ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
     # X_train = np.hstack(X).reshape(10000,224,224,3)
     # X = pickle.load( open("images_224.p", "rb"))
-    h5f = h5py.File('..dataset_h5/images_ar_6_delta_{}.h5'.format(delta),'r')
+    
+    h5f = h5py.File('../dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
+    
     X_train = h5f['data_train']
-    #X_train = np.hstack(X).reshape(3,224,224,16160).T
 
-    #X_train = X_train.astype('float32')
+    # ava_table = ava_table.ix[(ava_table['aspect_ratio'] == 6 )]
 
     Y_train = ava_table.ix[:, "good"].as_matrix()
     Y_train = to_categorical(Y_train, 2)
 
-    # X_test = h5f['data_test']
-    # ava_test = store['labels_test']
-    # Y_test = ava_test.ix[:, "good"].as_matrix()
-    # Y_test = to_categorical(Y_test, 2)
+    X_test = h5f['data_test']
+    ava_test = store['labels_test']
+    Y_test = ava_test.ix[:, "good"].as_matrix()
+    Y_test = to_categorical(Y_test, 2)
 
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
     model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
 
     csv_logger = CSVLogger('training_gap_binary.log')
 
-    #model.fit(X_train,Y_train,
-    #    nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger])
+    checkpointer = ModelCheckpoint(filepath="/tmp/weights.hdf5", verbose=1, save_best_only=True)
+
+    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=1, min_lr=1e-6)
+
+    model.fit(X_train,Y_train,
+        nb_epoch=20, batch_size=32, shuffle="batch", callbacks=[csv_logger,checkpointer,reduce_lr])
 
 
     ava_path = "../dataset/AVA/data/"

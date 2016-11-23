@@ -14,7 +14,7 @@ from keras.layers.core import Flatten, Dense, Dropout
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.utils.np_utils import to_categorical
 from keras.optimizers import SGD
-from keras.callbacks import CSVLogger
+from keras.callbacks import CSVLogger, ReduceLROnPlateau
 
 
 def VGG_19(weights_path=None):
