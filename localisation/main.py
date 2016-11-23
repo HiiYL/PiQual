@@ -26,57 +26,38 @@ def VGG_19_GAP_functional(weights_path=None,heatmap=False):
 
     inputs = Input(shape=(3, None, None))
 
-    x = Convolution2D(64, 3, 3, activation='relu',border_mode='same',name='conv1_1')(inputs)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(64, 3, 3, activation='relu',name='conv1_2')(x)
-    x = MaxPooling2D((2,2), strides=(2,2))(x)
+    x = Convolution2D(64, 3, 3, activation='relu',name='conv1_1',border_mode ='same')(inputs)
+    x = Convolution2D(64, 3, 3, activation='relu',name='conv1_2',border_mode = 'same')(x)
+    x = MaxPooling2D((2,2), strides=(2,2), dim_ordering="th")(x)
 
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(128, 3, 3, activation='relu',name='conv2_1')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(128, 3, 3, activation='relu',name='conv2_2')(x)
-    x = MaxPooling2D((2,2), strides=(2,2))(x)
+    x = Convolution2D(128, 3, 3, activation='relu',name='conv2_1',border_mode = 'same')(x)
+    x = Convolution2D(128, 3, 3, activation='relu',name='conv2_2',border_mode = 'same')(x)
+    x = MaxPooling2D((2,2), strides=(2,2), dim_ordering="th")(x)
 
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_1')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_2')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_3')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_4')(x)
-    x = MaxPooling2D((2,2), strides=(2,2))(x)
+    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_1',border_mode = 'same')(x)
+    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_2',border_mode = 'same')(x)
+    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_3',border_mode = 'same')(x)
+    x = Convolution2D(256, 3, 3, activation='relu',name='conv3_4',border_mode = 'same')(x)
+    x = MaxPooling2D((2,2), strides=(2,2), dim_ordering="th")(x)
 
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_1')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_2')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_3')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_4')(x)
-    x = MaxPooling2D((2,2), strides=(2,2))(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_1',border_mode = 'same')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_2',border_mode = 'same')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_3',border_mode = 'same')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv4_4',border_mode = 'same')(x)
+    x = MaxPooling2D((2,2), strides=(2,2), dim_ordering="th")(x)
 
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_1')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_2')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_3')(x)
-    x = ZeroPadding2D((1,1))(x)
-    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_4')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_1',border_mode = 'same')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_2',border_mode = 'same')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_3',border_mode = 'same')(x)
+    x = Convolution2D(512, 3, 3, activation='relu',name='conv5_4',border_mode = 'same')(x)
 
-    x = ZeroPadding2D((1,1))(x)
-    final_conv = Convolution2D(1024, 3, 3, activation='relu',name='conv6_1')(x)
-
-    x = GlobalAveragePooling2D()(final_conv)
+    conv_output = Convolution2D(1024, 3, 3, activation='relu',name='conv6_1',border_mode = 'same')(x)
+    x = GlobalAveragePooling2D()(conv_out)
 
     main_output = Dense(2, activation = 'softmax', name="main_output")(x)
-    aux_output = final_conv
-
 
     if heatmap:
-        model = Model(input=inputs, output=[main_output,aux_output])
+        model = Model(input=inputs, output=[main_output,conv_output])
     else:
         model = Model(input=inputs, output=main_output)#[main_output,aux_output])
 
@@ -113,27 +94,27 @@ def read_and_generate_heatmap(input_path, output_path):
     out = model.predict(im)
 
     class_weights = model.layers[-1].get_weights()[0]
-
-    out[1] = out[1][0,:,:,:]
-
-    #Create the class activation map.
-    cam = np.zeros(dtype = np.float32, shape = out[1].shape[1:3])
-
-    class_to_visualize = 1 # 0 for bad, 1 for good
-    for i, w in enumerate(class_weights[:, class_to_visualize]):
-            cam += w * out[1][i, :, :]
     print("predictions", out[0])
-    cam /= np.max(cam)
-    cam = cv2.resize(cam, (height, width))
-    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-    heatmap[np.where(cam < 0.2)] = 0
-    im = heatmap*0.5 + original_img
-    cv2.imwrite(output_path, im)
 
+    for i in range(5):
+        conv_output = out[i][0,:,:,:]
+        #Create the class activation map.
+        cam = np.zeros(dtype = np.float32, shape = conv_output.shape[1:3])
+
+        class_to_visualize = 1 # 0 for bad, 1 for good
+        for i, w in enumerate(class_weights[:, class_to_visualize]):
+                cam += w * conv_output[i, :, :]
+
+        cam /= np.max(cam)
+        cam = cv2.resize(cam, (height, width))
+        heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+        heatmap[np.where(cam < 0.2)] = 0
+        temp = heatmap*0.5 + original_img
+        cv2.imwrite(output_path, temp)
 
 if __name__ == "__main__":
     
-    model = VGG_19_GAP_functional(weights_path='aesthestic_gap_weights_1.h5',heatmap=True)
+    model = VGG_19_GAP_functional(weights_path='../aesthestic_gap_weights_1_tensorflow.h5',heatmap=True)
 
     delta = 0.0
     store = HDFStore('../dataset_h5/labels.h5','r')
@@ -157,7 +138,6 @@ if __name__ == "__main__":
     Y_test = ava_test.ix[:, "good"].as_matrix()
     Y_test = to_categorical(Y_test, 2)
 
-
     sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
     model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
 
@@ -179,7 +159,7 @@ if __name__ == "__main__":
 
     ava_path = "../dataset/AVA/data/"
 
-    for index in ava_test.iloc[::-1][:25].index:
+    for index in ava_test.iloc[::-1][:1].index:
         image_name = str(index) + ".jpg"
         input_path = ava_path + image_name
         output_path = "output/" + image_name
