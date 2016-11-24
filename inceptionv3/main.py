@@ -1,4 +1,4 @@
-from keras.applications.resnet50 import ResNet50
+from keras.applications.inception_v3 import InceptionV3
 from keras.callbacks import ModelCheckpoint
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 
@@ -47,20 +47,62 @@ def deprocess_image(image):
 
     return im
 
-model = InceptionV3(include_top=True, weights='imagenet', input_tensor=None)
+def read_and_generate_heatmap(input_path, output_path):
+    original_img = cv2.imread(input_path).astype(np.float32)
 
-model.layers.pop()
-model.layers.pop()
-model.layers.pop()
+    width, height, _ = original_img.shape
+
+    im = process_image(cv2.resize(original_img,(299,299)))
+    out = model.predict(im)
+
+    class_weights = model.layers[-1].get_weights()[0]
+    print("predictions", out[0])
+
+
+    conv_output = out[1][0,:,:,:]
+    #Create the class activation map.
+    cam = np.zeros(dtype = np.float32, shape = conv_output.shape[1:3])
+
+    class_to_visualize = 1 # 0 for bad, 1 for good
+    for i, w in enumerate(class_weights[:, class_to_visualize]):
+            cam += w * conv_output[i, :, :]
+
+    cam /= np.max(cam)
+    cam = cv2.resize(cam, (height, width))
+    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+    heatmap[np.where(cam < 0.2)] = 0
+    temp = heatmap*0.5 + original_img
+    cv2.imwrite(output_path, temp)
+
+model = InceptionV3(include_top=True, weights=None, input_tensor=None)
+
+
+
+for i in range(3):
+    model.layers.pop()
+
+
+
 
 model.outputs = [model.layers[-1].output]
 model.layers[-1].outbound_nodes = []
 
 final_conv = Convolution2D(1024, 3, 3, activation='relu',name='conv6_1',border_mode = 'same')(model.outputs[0])
 
+
 x = GlobalAveragePooling2D()(final_conv)
 aesthetic_prediction_layer = Dense(output_dim=2, activation='softmax')(x)
-model = Model(input=model.inputs, output=[aesthetic_prediction_layer,final_conv])
+
+
+heatmap = True
+
+if heatmap:
+    model = Model(input=model.inputs, output=[aesthetic_prediction_layer,final_conv])
+    model.load_weights('weights.hdf5')
+else:
+    model = Model(input=model.inputs, output=aesthetic_prediction_layer)
+
+
 
 delta = 0.0
 store = HDFStore('../dataset_h5/labels.h5','r')
@@ -87,10 +129,18 @@ Y_test = to_categorical(Y_test, 2)
 sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
 model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
 
-checkpointer = ModelCheckpoint(filepath="/tmp/weights.hdf5", verbose=1, save_best_only=True)
+checkpointer = ModelCheckpoint(filepath="tmp/weights.hdf5", verbose=1, save_best_only=True)
 
-reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=1, min_lr=1e-6)
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=0, min_lr=1e-6)
 
 csv_logger = CSVLogger('training_gap_binary.log')
 
-model.fit(X_train,Y_train,nb_epoch=10, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer])
+model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr])
+
+ava_path = "../dataset/AVA/data/"
+
+for index in ava_test.iloc[::-1][:25].index:
+    image_name = str(index) + ".jpg"
+    input_path = ava_path + image_name
+    output_path = "output/" + image_name
+    read_and_generate_heatmap(input_path, output_path)

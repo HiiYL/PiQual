@@ -7,8 +7,7 @@ from keras import backend as K
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.layers.pooling import GlobalAveragePooling2D
 from keras.utils.np_utils import to_categorical
-
-from keras.callbacks import CSVLogger, ReduceLROnPlateau,ModelCheckpoint
+from keras.callbacks import CSVLogger
 
 import cv2
 
@@ -98,25 +97,25 @@ def read_and_generate_heatmap(input_path, output_path):
     class_weights = model.layers[-1].get_weights()[0]
     print("predictions", out[0])
 
-    for i in range(5):
-        conv_output = out[i][0,:,:,:]
-        #Create the class activation map.
-        cam = np.zeros(dtype = np.float32, shape = conv_output.shape[1:3])
 
-        class_to_visualize = 1 # 0 for bad, 1 for good
-        for i, w in enumerate(class_weights[:, class_to_visualize]):
-                cam += w * conv_output[i, :, :]
+    conv_output = out[1][0,:,:,:]
+    #Create the class activation map.
+    cam = np.zeros(dtype = np.float32, shape = conv_output.shape[1:3])
 
-        cam /= np.max(cam)
-        cam = cv2.resize(cam, (height, width))
-        heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-        heatmap[np.where(cam < 0.2)] = 0
-        temp = heatmap*0.5 + original_img
-        cv2.imwrite(output_path, temp)
+    class_to_visualize = 1 # 0 for bad, 1 for good
+    for i, w in enumerate(class_weights[:, class_to_visualize]):
+            cam += w * conv_output[i, :, :]
+
+    cam /= np.max(cam)
+    cam = cv2.resize(cam, (height, width))
+    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+    heatmap[np.where(cam < 0.2)] = 0
+    temp = heatmap*0.5 + original_img
+    cv2.imwrite(output_path, temp)
 
 if __name__ == "__main__":
     
-    model = VGG_19_GAP_functional(weights_path='aesthestic_gap_weights_1_tensorflow.h5',heatmap=False)
+    model = VGG_19_GAP_functional(weights_path='aesthestic_gap_weights_1.h5',heatmap=True)
 
     delta = 0.0
     store = HDFStore('../dataset_h5/labels.h5','r')
@@ -126,12 +125,11 @@ if __name__ == "__main__":
     ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
     # X_train = np.hstack(X).reshape(10000,224,224,3)
     # X = pickle.load( open("images_224.p", "rb"))
-    
     h5f = h5py.File('../dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
-    
     X_train = h5f['data_train']
+    #X_train = np.hstack(X).reshape(3,224,224,16160).T
 
-    # ava_table = ava_table.ix[(ava_table['aspect_ratio'] == 6 )]
+    #X_train = X_train.astype('float32')
 
     Y_train = ava_table.ix[:, "good"].as_matrix()
     Y_train = to_categorical(Y_train, 2)
@@ -146,17 +144,13 @@ if __name__ == "__main__":
 
     csv_logger = CSVLogger('training_gap_binary.log')
 
-    checkpointer = ModelCheckpoint(filepath="/tmp/weights.hdf5", verbose=1, save_best_only=True)
-
-    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=1, min_lr=1e-6)
-
-    model.fit(X_train,Y_train,
-        nb_epoch=20, batch_size=32, shuffle="batch", callbacks=[csv_logger,checkpointer,reduce_lr])
+    #model.fit(X_train,Y_train,
+    #    nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger])
 
 
     ava_path = "../dataset/AVA/data/"
 
-    for index in ava_test.iloc[::-1][:1].index:
+    for index in ava_test.iloc[::-1][:25].index:
         image_name = str(index) + ".jpg"
         input_path = ava_path + image_name
         output_path = "output/" + image_name
