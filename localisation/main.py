@@ -150,17 +150,46 @@ if __name__ == "__main__":
 
     ava_path = "../dataset/AVA/data/"
 
-    for index in ava_test.iloc[::-1][:25].index:
+
+
+    # for index in ava_test.iloc[::-1][:25].index:
+    #     image_name = str(index) + ".jpg"
+    #     input_path = ava_path + image_name
+    #     output_path = "output/" + image_name
+    #     read_and_generate_heatmap(input_path, output_path)
+
+
+    # saliency_benchmark_dir = "vanishingpoint/"
+    # output_dir = "vanishingpoint/output/"
+    # for file in os.listdir(saliency_benchmark_dir):
+    #     if 'jpg' in file:
+    #         read_and_generate_heatmap(saliency_benchmark_dir + file, output_dir + file)
+
+
+    tag = 17
+    semantic_tag_df = ava_test.ix[(ava_test.ix[:,10] == tag) | (ava_test.ix[:,11] == tag)]
+    for index in semantic_tag_df.iloc[::-1][:25].index:
         image_name = str(index) + ".jpg"
         input_path = ava_path + image_name
-        output_path = "output/" + image_name
+        output_path = "output-semantic/6/" + image_name
         read_and_generate_heatmap(input_path, output_path)
 
+    # style = pd.read_table('../dataset/AVA/style_image_lists/train.jpgl', index_col=0)
+    # tag = pd.read_table('../dataset/AVA/style_image_lists/train.lab')
 
-    saliency_benchmark_dir = "MITSalBenchmark/"
-    output_dir = "MITSalBenchmark/output/"
-    for file in os.listdir(saliency_benchmark_dir):
-        read_and_generate_heatmap(saliency_benchmark_dir + file, output_dir + file)
+    # style.loc[:,'style'] = tag.as_matrix()
+
+    # ava_with_style = style.join(ava_table, how='inner')
+
+    # vanishing_point = ava_with_style.ix[(ava_with_style.ix[:,'style'] == 13)]
+
+    # vanishing_point = vanishing_point.sort_values(by="score")
+
+    # for index in vanishing_point.iloc[::-1][:25].index:
+    #     image_name = str(index) + ".jpg"
+    #     input_path = ava_path + image_name
+    #     output_path = "output-semantic/6/" + image_name
+    #     read_and_generate_heatmap(input_path, output_path)
 
 
 
