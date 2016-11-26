@@ -243,14 +243,16 @@ def read_and_generate_heatmap(input_path, output_path):
     out = model.predict(im)
 
     class_weights = model.layers[-1].get_weights()[0]
-    print("predictions", out[0])
+    top_3_hits = np.argsort(out[0], axis=1)[0][::-1][:3]
+    print("predictions", top_3_hits)
+    [print(semantics.ix[hit + 1].semantic) for hit in top_3_hits]
 
 
     conv_output = out[1][0,:,:,:]
     #Create the class activation map.
     cam = np.zeros(dtype = np.float32, shape = conv_output.shape[1:3])
 
-    class_to_visualize = 1 # 0 for bad, 1 for good
+    class_to_visualize = np.argmax(out[0]) # visualise best class
     for i, w in enumerate(class_weights[:, class_to_visualize]):
             cam += w * conv_output[i, :, :]
 
@@ -288,11 +290,11 @@ Y_test = to_categorical(ava_test.ix[:,10:12].as_matrix())[:,1:]
 sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
 model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
 
-checkpointer = ModelCheckpoint(filepath="googlenet_aesthetics_weights.h5", verbose=1, save_best_only=True)
+checkpointer = ModelCheckpoint(filepath="googlenet_semantics_weights.h5", verbose=1, save_best_only=True)
 
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=1, min_lr=1e-6)
 
-csv_logger = CSVLogger('training_gap_binary' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '.log')
+csv_logger = CSVLogger('training_gap_semantics' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '.log')
 
 model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr])
 
@@ -300,7 +302,7 @@ model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch", validatio
 
 
 
-model = create_googlenet('googlenet_aesthetics_weights.h5', heatmap=True)
+model = create_googlenet('googlenet_semantics_weights.h5', heatmap=True)
 
 ava_path = "../dataset/AVA/data/"
 style = pd.read_table('../dataset/AVA/style_image_lists/train.jpgl', index_col=0)
@@ -317,6 +319,17 @@ vanishing_point = vanishing_point.sort_values(by="score")
 
 
 for index in vanishing_point.iloc[::-1][:25].index:
+    image_name = str(index) + ".jpg"
+    input_path = ava_path + image_name
+    output_path = "output-semantic/6/" + image_name
+    read_and_generate_heatmap(input_path, output_path)
+
+semantics = pd.read_table('../dataset/AVA/tags.txt',delimiter="(\d+)", usecols=[1,2], index_col=0, header=None,names=['index','semantic'])
+
+
+tag = 1
+semantic_tag_df = ava_test.ix[(ava_test.ix[:,10] == tag) | (ava_test.ix[:,11] == tag)]
+for index in semantic_tag_df.iloc[::-1][:25].index:
     image_name = str(index) + ".jpg"
     input_path = ava_path + image_name
     output_path = "output-semantic/6/" + image_name

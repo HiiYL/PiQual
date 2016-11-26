@@ -40,6 +40,8 @@ from keras.regularizers import l2
 from keras.optimizers import SGD
 from googlenet_custom_layers import PoolHelper,LRN
 
+from datetime import datetime
+
 
 def create_googlenet(weights_path=None, heatmap=False):
     # creates GoogLeNet a.k.a. Inception v1 (Szegedy, 2015)
@@ -291,9 +293,12 @@ checkpointer = ModelCheckpoint(filepath="googlenet_aesthetics_weights.h5", verbo
 
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=1, min_lr=1e-6)
 
-csv_logger = CSVLogger('training_gap_binary.log')
+csv_logger = CSVLogger('training_gap_aesthetics' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '.log')
 
-model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr])
+
+class_weight = {0 : 0.67, 1: 0.33}
+
+model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr],class_weight = class_weight)
 
 
 
