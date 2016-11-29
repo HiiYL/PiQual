@@ -296,9 +296,8 @@ reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=1, min_lr=
 csv_logger = CSVLogger('training_gap_aesthetics' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '.log')
 
 
-class_weight = {0 : 0.67, 1: 0.33}
-
-model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr],class_weight = class_weight)
+# class_weight = {0 : 0.67, 1: 0.33}
+model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr])#,class_weight = class_weight)
 
 
 
