@@ -200,9 +200,7 @@ def create_googlenet(weights_path=None, heatmap=False):
 
     conv_output_aesthetics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_aesthetics',border_mode = 'same')(inception_4e_output_aesthetics)
 
-    x_aesthetics = GlobalAveragePooling2D()(conv_output_aesthetics)
-
-    output_aesthetics = Dense(2, activation = 'softmax', name="output_aesthetics")(x_aesthetics)
+    # x_aesthetics = GlobalAveragePooling2D()(conv_output_aesthetics)
 
 
     inception_4e_1x1_semantics = Convolution2D(256,1,1,border_mode='same',activation='relu',name='inception_4e/1x1_semantics',W_regularizer=l2(0.0002))(inception_4d_output)
@@ -223,14 +221,20 @@ def create_googlenet(weights_path=None, heatmap=False):
 
     conv_output_semantics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_semantics',border_mode = 'same')(inception_4e_output_semantics)
 
-    x_semantics = GlobalAveragePooling2D()(conv_output_semantics)
+    # x_semantics = GlobalAveragePooling2D()(conv_output_semantics)
 
-    output_semantics = Dense(65, activation = 'softmax', name="output_semantics")(x_semantics)
+    merged_aesthetics_semantics = merge([conv_output_aesthetics,conv_output_semantics],mode='concat',concat_axis=1,name='merge')
+
+    # conv_merged = Convolution2D(1024, 3, 3, activation='relu',name='conv_7_1_merged',border_mode = 'same')(merged_aesthetics_semantics)
+
+    global_merged_pooling = GlobalAveragePooling2D()(merged_aesthetics_semantics)
+
+    output_merged = Dense(2, activation = 'softmax', name="output_merged")(global_merged_pooling)
 
     if heatmap:
-        googlenet = Model(input=input, output=[output_aesthetics,output_semantics, conv_output_aesthetics, conv_output_semantics])
+        googlenet = Model(input=input, output=[output_merged,merged_aesthetics_semantics])
     else:
-        googlenet = Model(input=input, output=[output_aesthetics,output_semantics])
+        googlenet = Model(input=input, output=[output_merged])
     
     if weights_path:
         googlenet.load_weights(weights_path,by_name=True)
@@ -292,7 +296,7 @@ def read_and_generate_heatmap(input_path, output_path):
         cv2.imwrite('images/{}_{}.jpg'.format(file_name, semantic_tags[nth_top_semantic]), temp)
 
 
-model = create_googlenet('googlenet_aesthetics_weights_joint.h5', heatmap=False)
+model = create_googlenet('googlenet_aesthetics_weights_joint.h5', heatmap=True)
 
 delta = 0.0
 store = HDFStore('../dataset_h5/labels.h5','r')
@@ -333,8 +337,8 @@ csv_logger = CSVLogger('training_gmp_aesthetics' + datetime.now().strftime('%Y-%
 # class_weight = {0 : 0.67, 1: 0.33}
 model.fit(X_train,[Y_train,Y_train_semantics],nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, [Y_test,Y_test_semantics]), callbacks=[csv_logger,checkpointer,reduce_lr])#,class_weight = class_weight)
 
-# from keras.utils.visualize_util import plot
-# plot(model, to_file='model.png')
+from keras.utils.visualize_util import plot
+plot(model, to_file='model.png')
 
 
 semantics = pd.read_table('../dataset/AVA/tags.txt',delimiter="(\d+)", usecols=[1,2], index_col=0, header=None,names=['index','semantic'])
