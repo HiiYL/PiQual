@@ -52,6 +52,41 @@ else:
     channel_axis = -1
 
 
+class LRExponentialDecay(Callback):
+    '''Reduce learning rate exponentially every n epochs.
+
+    # Example
+        ```python
+            reduce_lr_exp = LRExponentialDecay(exponential_decay_factor=0.94, every_n_epochs=2)
+            model.fit(X_train, Y_train, callbacks=[reduce_lr_exp])
+        ```
+    # Arguments
+        exponential_decay_factor: hyperparameter of exponent by which learning rate will be reduced. 
+        every_n_epochs: how often to reduce learning rate by exponential factor
+    '''
+
+    def __init__(self, exponential_decay_factor=0.94, every_n_epochs=2):
+        super(Callback, self).__init__()
+        self.exponential_decay_factor=exponential_decay_factor
+        self.every_n_epochs=every_n_epochs
+        self.wait=0
+        self.reset()
+
+    def reset(self):
+        self.epoch_counter_curr=0
+
+    def on_train_begin(self, logs={}):
+        self.reset()
+
+    def on_epoch_end(self, epoch, logs={}):
+        if self.wait >= self.every_n_epochs:
+            old_lr = K.get_value(self.model.optimizer.lr)
+            new_lr = old_lr * np.exp(-self.exponential_decay_factor * (epoch / every_n_epochs))
+            K.set_value(self.model.optimizer.lr, new_lr)
+            self.wait = 0
+        else:
+            self.wait += 1
+
 def inception_stem(input): # Input (299,299,3)
     # Input Shape is 299 x 299 x 3 (th) or 3 x 299 x 299 (th)
     c = Convolution2D(32, 3, 3, activation='relu', subsample=(2,2))(input)
@@ -276,8 +311,8 @@ time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 checkpointer = ModelCheckpoint(filepath="googlenet_aesthetics_weights{}.h5".format(time_now), verbose=1, save_best_only=True)
 
-reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=1, min_lr=1e-6)
+reduce_lr_exp = LRExponentialDecay(exponential_decay_factor=0.94, every_n_epochs=2)
 
 csv_logger = CSVLogger('training_gmp_aesthetics{}.log'.format(time_now))
 
-model.fit(X_train,[Y_train,Y_train_semantics],nb_epoch=20, batch_size=31, shuffle="batch", validation_data=(X_test, [Y_test,Y_test_semantics]), callbacks=[csv_logger,checkpointer,reduce_lr])#,class_weight = class_weight)
+model.fit(X_train,[Y_train,Y_train_semantics],nb_epoch=20, batch_size=31, shuffle="batch", validation_data=(X_test, [Y_test,Y_test_semantics]), callbacks=[csv_logger,checkpointer,reduce_lr_exp])#,class_weight = class_weight)
