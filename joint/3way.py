@@ -227,10 +227,32 @@ def create_googlenet(weights_path=None, heatmap=False):
 
     output_semantics = Dense(65, activation = 'softmax', name="output_semantics")(x_semantics)
 
+    inception_4e_1x1_style = Convolution2D(256,1,1,border_mode='same',activation='relu',name='inception_4e/1x1_style',W_regularizer=l2(0.0002))(inception_4d_output)
+    
+    inception_4e_3x3_reduce_style = Convolution2D(160,1,1,border_mode='same',activation='relu',name='inception_4e/3x3_reduce_style',W_regularizer=l2(0.0002))(inception_4d_output)
+    
+    inception_4e_3x3_style = Convolution2D(320,3,3,border_mode='same',activation='relu',name='inception_4e/3x3_style',W_regularizer=l2(0.0002))(inception_4e_3x3_reduce_style)
+    
+    inception_4e_5x5_reduce_style = Convolution2D(32,1,1,border_mode='same',activation='relu',name='inception_4e/5x5_reduce_style',W_regularizer=l2(0.0002))(inception_4d_output)
+    
+    inception_4e_5x5_style = Convolution2D(128,5,5,border_mode='same',activation='relu',name='inception_4e/5x5_style',W_regularizer=l2(0.0002))(inception_4e_5x5_reduce_style)
+    
+    inception_4e_pool_style = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='inception_4e/pool_style')(inception_4d_output)
+    
+    inception_4e_pool_proj_style = Convolution2D(128,1,1,border_mode='same',activation='relu',name='inception_4e/pool_proj_style',W_regularizer=l2(0.0002))(inception_4e_pool_style)
+    
+    inception_4e_output_style = merge([inception_4e_1x1_style,inception_4e_3x3_style,inception_4e_5x5_style,inception_4e_pool_proj_style],mode='concat',concat_axis=1,name='inception_4e/output_style')
+
+    conv_output_style = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_style',border_mode = 'same')(inception_4e_output_style)
+
+    x_style = GlobalAveragePooling2D()(conv_output_style)
+
+    output_style = Dense(14, activation = 'softmax', name="output_style")(x_style)
+
     if heatmap:
-        googlenet = Model(input=input, output=[output_aesthetics,output_semantics, conv_output_aesthetics, conv_output_semantics])
+        googlenet = Model(input=input, output=[output_aesthetics,output_semantics,output_style, conv_output_aesthetics, conv_output_semantics,conv_output_style])
     else:
-        googlenet = Model(input=input, output=[output_aesthetics,output_semantics])
+        googlenet = Model(input=input, output=[output_aesthetics,output_semantics, output_style])
     
     if weights_path:
         googlenet.load_weights(weights_path,by_name=True)
@@ -310,7 +332,7 @@ def read_and_generate_heatmap(input_path, output_path):
         cv2.imwrite('output/{}_{}.jpg'.format(file_name, semantic_tags[nth_top_semantic]), temp)
 
 
-model = create_googlenet('googlenet_aesthetics_weights_joint.h5', heatmap=True)
+model = create_googlenet('googlenet_aesthetics_weights_joint.h5', heatmap=False)
 
 delta = 0.0
 store = HDFStore('../dataset_h5/labels.h5','r')
