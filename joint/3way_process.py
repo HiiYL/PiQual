@@ -58,7 +58,7 @@ for index in ava_with_style.index:
 
 
 style_test = pd.read_table('../dataset/AVA/style_image_lists/test.jpgl', index_col=0)
-tag_test = pd.read_table('../dataset/AVA/style_image_lists/test.lab')
+tag_test = pd.read_table('../dataset/AVA/style_image_lists/test.multilab')
 
 style_test.loc[:,'style'] = tag_test.as_matrix()
 

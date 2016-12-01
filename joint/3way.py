@@ -354,12 +354,22 @@ Y_train = to_categorical(Y_train, 2)
 
 Y_train_semantics = to_categorical(ava_table.ix[:,10:12].as_matrix())[:,1:]
 
-X_test = h5f_style['data_style_train']
-ava_test = store['labels_with_style_test']
+Y_train_style = to_categorical(ava_table.ix[:,0])
+
+# X_test = h5f_style['data_style_train']
+# ava_test = store['labels_with_style_test']
+# Y_test = ava_test.ix[:, "good"].as_matrix()
+# Y_test = to_categorical(Y_test, 2)
+
+# Y_test_semantics = to_categorical(ava_test.ix[:,10:12].as_matrix())[:,1:]
+
+X_test = h5f['data_test']
+ava_test = store['labels_test']
 Y_test = ava_test.ix[:, "good"].as_matrix()
 Y_test = to_categorical(Y_test, 2)
 
 Y_test_semantics = to_categorical(ava_test.ix[:,10:12].as_matrix())[:,1:]
+Y_test_style = np.round(np.random.rand(Y_test.shape[0],14))
 
 sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
 model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
