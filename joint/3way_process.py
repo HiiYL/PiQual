@@ -12,7 +12,14 @@ ava_with_style = style.join(ava_table, how='inner')
 
 store['labels_with_style'] = ava_with_style
 
-data = self.h5f.create_dataset("data_style_train",(periodNum,channel,width,height), dtype='uint8')
+
+h5f = h5py.File('dataset_h5/images_with_style.h5'.format(delta),'w')
+
+channel = 3
+width = 224
+height = 224
+
+data = h5f.create_dataset("data_style_train",(periodNum,channel,width,height), dtype='uint8')
 
 periodNum = ava_with_style.shape[0]
 
