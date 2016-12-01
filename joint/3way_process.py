@@ -1,4 +1,13 @@
-store = HDFStore('../dataset_h5/labels.h5','r')
+from pandas import HDFStore
+import pandas as pd
+
+
+import os
+
+import h5py
+import cv2
+import numpy as np
+store = HDFStore('../dataset_h5/labels.h5')
 
 ava_table = store['labels']
 
@@ -13,29 +22,36 @@ ava_with_style = style.join(ava_table, how='inner')
 store['labels_with_style'] = ava_with_style
 
 
-h5f = h5py.File('dataset_h5/images_with_style.h5'.format(delta),'w')
+h5f = h5py.File('images_with_style.h5','w')
 
 channel = 3
 width = 224
 height = 224
 
-data = h5f.create_dataset("data_style_train",(periodNum,channel,width,height), dtype='uint8')
-
 periodNum = ava_with_style.shape[0]
 
+data = h5f.create_dataset("data_style_train",(periodNum,channel,width,height), dtype='uint8')
+
+
+ava_path = "../dataset/AVA/data/"
+ava_data_path = os.path.join(os.getcwd(), ava_path)
+
+i=0
 for index in ava_with_style.index:
   if(i >= periodNum):
     break
   if (i % 1000) == 0:
-      print('Now Processing {0}/{1}'.format(i,periodNum))
-      filename = str(index) + ".jpg"
-      filepath = os.path.join(self.ava_data_path, filename)
-      im = cv2.resize(cv2.imread(filepath), (width, height)).astype(np.float32)
-      im[:,:,0] -= 103.939
-      im[:,:,1] -= 116.779
-      im[:,:,2] -= 123.68
-      im = im.transpose((2,0,1))
-      im = np.expand_dims(im, axis=0)
-      data[i] = im
-      i=i+1
+    print('Now Processing {0}/{1}'.format(i,periodNum))
+    filename = str(index) + ".jpg"
+    filepath = os.path.join(ava_data_path, filename)
+    im = cv2.resize(cv2.imread(filepath), (width, height)).astype(np.float32)
+    im[:,:,0] -= 103.939
+    im[:,:,1] -= 116.779
+    im[:,:,2] -= 123.68
+    im = im.transpose((2,0,1))
+    im = np.expand_dims(im, axis=0)
+    data[i] = im 
+  i=i+1
 	
+
+h5f.close()
