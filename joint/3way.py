@@ -247,7 +247,7 @@ def create_googlenet(weights_path=None, heatmap=False):
 
     x_style = GlobalAveragePooling2D()(conv_output_style)
 
-    output_style = Dense(14, activation = 'softmax', name="output_style")(x_style)
+    output_style = Dense(15, activation = 'softmax', name="output_style")(x_style)
 
     if heatmap:
         googlenet = Model(input=input, output=[output_aesthetics,output_semantics,output_style, conv_output_aesthetics, conv_output_semantics,conv_output_style])
@@ -334,12 +334,12 @@ def read_and_generate_heatmap(input_path, output_path):
 
 model = create_googlenet('googlenet_aesthetics_weights_joint.h5', heatmap=False)
 
-#delta = 0.0
+delta = 0.0
 store = HDFStore('../dataset_h5/labels.h5','r')
 # delta = 1
 ava_table = store['labels_with_style']
 
-ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
+#ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
 # X_train = np.hstack(X).reshape(10000,224,224,3)
 # X = pickle.load( open("images_224.p", "rb"))
 h5f = h5py.File('../dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
@@ -352,9 +352,9 @@ X_train = h5f_style['data_style_train']
 Y_train = ava_table.ix[:, "good"].as_matrix()
 Y_train = to_categorical(Y_train, 2)
 
-Y_train_semantics = to_categorical(ava_table.ix[:,10:12].as_matrix())[:,1:]
+Y_train_semantics = to_categorical(ava_table.ix[:,11:13].as_matrix())[:,1:]
 
-Y_train_style = to_categorical(ava_table.ix[:,0])
+Y_train_style = to_categorical(ava_table.ix[:,0].as_matrix())
 
 # X_test = h5f_style['data_style_train']
 # ava_test = store['labels_with_style_test']
@@ -369,9 +369,9 @@ Y_test = ava_test.ix[:, "good"].as_matrix()
 Y_test = to_categorical(Y_test, 2)
 
 Y_test_semantics = to_categorical(ava_test.ix[:,10:12].as_matrix())[:,1:]
-Y_test_style = np.round(np.random.rand(Y_test.shape[0],14))
+Y_test_style = np.round(np.random.rand(Y_test.shape[0],15))
 
-sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
+sgd = SGD(lr=0.0001, decay=5e-4, momentum=0.9, nesterov=True)
 model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
 
 checkpointer = ModelCheckpoint(filepath="googlenet_aesthetics_weights_max.h5", verbose=1, save_best_only=True)
@@ -382,10 +382,12 @@ csv_logger = CSVLogger('training_gmp_aesthetics' + datetime.now().strftime('%Y-%
 
 
 # class_weight = {0 : 0.67, 1: 0.33}
-model.fit(X_train,[Y_train,Y_train_semantics],nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, [Y_test,Y_test_semantics]), callbacks=[csv_logger,checkpointer,reduce_lr])#,class_weight = class_weight)
+model.fit(X_train,[Y_train,Y_train_semantics,Y_train_style],nb_epoch=20, batch_size=32, shuffle="batch", callbacks=[csv_logger,checkpointer,reduce_lr])#,class_weight = class_weight)
 
 # from keras.utils.visualize_util import plot
 # plot(model, to_file='model.png')
+
+results = model.evaluate(X_test, [Y_test,Y_test_semantics,Y_test_style])
 
 
 semantics = pd.read_table('../dataset/AVA/tags.txt',delimiter="(\d+)", usecols=[1,2], index_col=0, header=None,names=['index','semantic'])

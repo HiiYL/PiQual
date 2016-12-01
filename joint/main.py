@@ -198,7 +198,7 @@ def create_googlenet(weights_path=None, heatmap=False):
     
     inception_4e_output_aesthetics = merge([inception_4e_1x1_aesthetics,inception_4e_3x3_aesthetics,inception_4e_5x5_aesthetics,inception_4e_pool_proj_aesthetics],mode='concat',concat_axis=1,name='inception_4e/output_aesthetics')
 
-    conv_output_aesthetics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_aesthetics',border_mode = 'same')(inception_4e_output_aesthetics)
+    conv_output_aesthetics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_aesthetics',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output_aesthetics)
 
     x_aesthetics = GlobalAveragePooling2D()(conv_output_aesthetics)
 
@@ -221,7 +221,7 @@ def create_googlenet(weights_path=None, heatmap=False):
     
     inception_4e_output_semantics = merge([inception_4e_1x1_semantics,inception_4e_3x3_semantics,inception_4e_5x5_semantics,inception_4e_pool_proj_semantics],mode='concat',concat_axis=1,name='inception_4e/output_semantics')
 
-    conv_output_semantics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_semantics',border_mode = 'same')(inception_4e_output_semantics)
+    conv_output_semantics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_semantics',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output_semantics)
 
     x_semantics = GlobalAveragePooling2D()(conv_output_semantics)
 
@@ -310,7 +310,7 @@ def read_and_generate_heatmap(input_path, output_path):
         cv2.imwrite('output/{}_{}.jpg'.format(file_name, semantic_tags[nth_top_semantic]), temp)
 
 
-model = create_googlenet('googlenet_aesthetics_weights_joint.h5', heatmap=True)
+model = create_googlenet('googlenet_aesthetics_weights.h5', heatmap=False)
 
 delta = 0.0
 store = HDFStore('../dataset_h5/labels.h5','r')
@@ -341,11 +341,13 @@ Y_test_semantics = to_categorical(ava_test.ix[:,10:12].as_matrix())[:,1:]
 sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
 model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
 
-checkpointer = ModelCheckpoint(filepath="googlenet_aesthetics_weights_max.h5", verbose=1, save_best_only=True)
+time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+checkpointer = ModelCheckpoint(filepath="googlenet_aesthetics_weights{}.h5".format(time_now), verbose=1, save_best_only=True)
 
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=1, min_lr=1e-6)
 
-csv_logger = CSVLogger('training_gmp_aesthetics' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '.log')
+csv_logger = CSVLogger('training_gmp_aesthetics{}.log'.format(time_now))
 
 
 # class_weight = {0 : 0.67, 1: 0.33}
