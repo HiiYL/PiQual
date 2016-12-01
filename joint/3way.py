@@ -354,8 +354,8 @@ Y_train = to_categorical(Y_train, 2)
 
 Y_train_semantics = to_categorical(ava_table.ix[:,10:12].as_matrix())[:,1:]
 
-X_test = h5f['data_test']
-ava_test = store['labels_test']
+X_test = h5f_style['data_style_train']
+ava_test = store['labels_with_style_test']
 Y_test = ava_test.ix[:, "good"].as_matrix()
 Y_test = to_categorical(Y_test, 2)
 
