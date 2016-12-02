@@ -196,11 +196,13 @@ def create_googlenet(weights_path=None, heatmap=False):
     
     inception_4e_pool_proj_aesthetics = Convolution2D(128,1,1,border_mode='same',activation='relu',name='inception_4e/pool_proj_aesthetics',W_regularizer=l2(0.0002))(inception_4e_pool_aesthetics)
     
-    inception_4e_output_aesthetics = merge([inception_4e_1x1_aesthetics,inception_4e_3x3_aesthetics,inception_4e_5x5_aesthetics,inception_4e_pool_proj_aesthetics],mode='concat',concat_axis=1,name='inception_4e/output_aesthetics')
+    inception_4e_output_aesthetics = merge([inception_4d_output,inception_4e_1x1_aesthetics,inception_4e_3x3_aesthetics,inception_4e_5x5_aesthetics,inception_4e_pool_proj_aesthetics],mode='concat',concat_axis=1,name='inception_4e/output_aesthetics')
 
     conv_output_aesthetics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_aesthetics',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output_aesthetics)
 
-    x_aesthetics = GlobalAveragePooling2D()(conv_output_aesthetics)
+    combined_aesthetics = merge([inception_4a_output,inception_4b_output,inception_4c_output,conv_output_aesthetics],mode='concat',concat_axis=1,name='merge_aesthetics')
+
+    x_aesthetics = GlobalAveragePooling2D()(combined_aesthetics)
 
     output_aesthetics = Dense(2, activation = 'softmax', name="output_aesthetics")(x_aesthetics)
 
@@ -223,12 +225,15 @@ def create_googlenet(weights_path=None, heatmap=False):
 
     conv_output_semantics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_semantics',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output_semantics)
 
-    x_semantics = GlobalAveragePooling2D()(conv_output_semantics)
+    combined_semantics = merge([inception_4a_output,inception_4b_output,inception_4c_output,conv_output_semantics],mode='concat',concat_axis=1,name='merge_semantics')
+    
+
+    x_semantics = GlobalAveragePooling2D()(combined_semantics)
 
     output_semantics = Dense(65, activation = 'softmax', name="output_semantics")(x_semantics)
 
     if heatmap:
-        googlenet = Model(input=input, output=[output_aesthetics,output_semantics, conv_output_aesthetics, conv_output_semantics])
+        googlenet = Model(input=input, output=[output_aesthetics,output_semantics, combined_aesthetics, combined_semantics])
     else:
         googlenet = Model(input=input, output=[output_aesthetics,output_semantics])
     
@@ -351,7 +356,7 @@ csv_logger = CSVLogger('training_gmp_aesthetics{}.log'.format(time_now))
 
 
 # class_weight = {0 : 0.67, 1: 0.33}
-model.fit(X_train,[Y_train,Y_train_semantics],nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, [Y_test,Y_test_semantics]), callbacks=[csv_logger,checkpointer,reduce_lr])#,class_weight = class_weight)
+model.fit(X_train,[Y_train,Y_train_semantics],nb_epoch=20, batch_size=110, shuffle="batch", validation_data=(X_test, [Y_test,Y_test_semantics]), callbacks=[csv_logger,checkpointer,reduce_lr])#,class_weight = class_weight)
 
 # from keras.utils.visualize_util import plot
 # plot(model, to_file='model.png')
