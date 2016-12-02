@@ -15,6 +15,7 @@ from keras.layers.pooling import GlobalAveragePooling2D, GlobalMaxPooling2D
 from keras.optimizers import SGD,RMSprop
 from keras.models import load_model
 
+from keras.callbacks import Callback
 
 import cv2
 
@@ -237,9 +238,6 @@ def create_inception_v4(input, heatmap=False):
 
     aesthetics = GlobalAveragePooling2D()(aesthetics)
     semantics = GlobalMaxPooling2D()(semantics)
-
-    aesthetics = Dropout(0.8)(aesthetics)
-    semantics = Dropout(0.8)(semantics)
 
     aesthetics = Dense(output_dim=2, activation='softmax',name="out_aesthetics")(aesthetics)
     semantics = Dense(output_dim=65, activation='softmax',name="out_semantics")(semantics)
