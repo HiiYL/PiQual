@@ -75,28 +75,42 @@ store['labels_test'] = standard_test_set
 store.close()
 
 
-# ## Preprocess Comments
-ava_comment_path = "dataset/AVA-Comments/"
-ava_comment_path = os.path.join(os.getcwd(), ava_comment_path)
-comments_series = pd.Series(index=ava_table.index)
-
-# store = HDFStore('dataset_h5/labels.h5')
-
-
 store = HDFStore('dataset_h5/labels.h5')
 ava_table = store['labels_train']
+## Preprocess Comments
+ava_comment_path = "dataset/AVA-Comments/"
+ava_comment_path = os.path.join(os.getcwd(), ava_comment_path)
 
-# ## Load comments and save
-labels_count = ava_table.shape[0]
-count=0
-for index, row in ava_table.iterrows():
-    if (count % 1000) == 0:
-        print('Now Processing Comments {0}/{1}'.format(count,labels_count))
-    filename = str(index) + ".txt"
-    filepath = os.path.join(ava_comment_path, filename)
-    with open(filepath,encoding = "ISO-8859-1") as f:
-        content = f.readlines()
-        stripped_contents = [ string.strip() for string in content ]
-        comments_series.ix[index] = stripped_contents
-    count = count + 1
+
+
+def extractComments(df):
+    comments_series = pd.Series(index=df.index)
+    labels_count = df.shape[0]
+    count=0
+    for index, row in df.iterrows():
+        if (count % 1000) == 0:
+            print('Now Processing Comments {0}/{1}'.format(count,labels_count))
+        filename = str(index) + ".txt"
+        filepath = os.path.join(ava_comment_path, filename)
+        with open(filepath,encoding = "ISO-8859-1") as f:
+            content = f.readlines()
+            if(len(content) > 0):
+                stripped_contents = ' '.join(content).strip() #[ string.strip() for string in content ]
+                comments_series.ix[index] = stripped_contents
+            else:
+                comments_series.ix[index] = ""
+        count = count + 1
+    comments_series = comments_series.astype('str')
+    return comments_series
+
+## Load comments and save
+
+
+comments_series = extractComments(ava_table)
 ava_table.loc[:,'comments'] = comments_series
+store['labels_train'] = ava_table
+
+ava_test = store['labels_test']
+comments_test_series = extractComments(ava_test)
+ava_test.loc[:,'comments'] = comments_test_series
+store['labels_test'] = ava_test
