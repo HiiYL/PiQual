@@ -351,7 +351,7 @@ csv_logger = CSVLogger('training_gmp_aesthetics{}.log'.format(time_now))
 
 
 # class_weight = {0 : 0.67, 1: 0.33}
-model.fit(X_train,[Y_train,Y_train_semantics],nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, [Y_test,Y_test_semantics]), callbacks=[csv_logger,checkpointer,reduce_lr])#,class_weight = class_weight)
+model.fit(X_train,[Y_train,Y_train_semantics],nb_epoch=20, batch_size=110, shuffle="batch", validation_data=(X_test, [Y_test,Y_test_semantics]), callbacks=[csv_logger,checkpointer,reduce_lr])#,class_weight = class_weight)
 
 # from keras.utils.visualize_util import plot
 # plot(model, to_file='model.png')

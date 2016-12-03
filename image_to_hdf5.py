@@ -135,9 +135,9 @@ class ImageToHDF5:
   #   self.h5f.attrs['split'] = H5PYDataset.create_split_array(split_dict)
 
 if __name__ == "__main__":
-  ihdf = ImageToHDF5(delta=0.0)
-  ihdf.prepare_train(dim=(299,299))
-  ihdf.prepare_test(dim=(299,299))
+  ihdf = ImageToHDF5(delta=1.0)
+  ihdf.prepare_train()
+  ihdf.prepare_test()
   ihdf.close()
 
 

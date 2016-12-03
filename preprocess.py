@@ -76,24 +76,27 @@ store.close()
 
 
 # ## Preprocess Comments
-# ava_comment_path = "dataset/AVA-Comments/"
-# ava_comment_path = os.path.join(os.getcwd(), ava_comment_path)
-# comments_series = pd.Series(index=ava_table.index)
+ava_comment_path = "dataset/AVA-Comments/"
+ava_comment_path = os.path.join(os.getcwd(), ava_comment_path)
+comments_series = pd.Series(index=ava_table.index)
 
 # store = HDFStore('dataset_h5/labels.h5')
 
 
+store = HDFStore('dataset_h5/labels.h5')
+ava_table = store['labels_train']
+
 # ## Load comments and save
-# labels_count = ava_table.shape[0]
-# count=0
-# for index, row in ava_table.iterrows():
-#     if (count % 1000) == 0:
-#         print('Now Processing Comments {0}/{1}'.format(count,labels_count))
-#     filename = str(index) + ".txt"
-#     filepath = os.path.join(ava_comment_path, filename)
-#     with open(filepath,encoding = "ISO-8859-1") as f:
-#         content = f.readlines()
-#         stripped_contents = [ string.strip() for string in content ]
-#         comments_series.ix[index] = stripped_contents
-#     count = count + 1
-# ava_table.loc[:,'comments'] = comments_series
+labels_count = ava_table.shape[0]
+count=0
+for index, row in ava_table.iterrows():
+    if (count % 1000) == 0:
+        print('Now Processing Comments {0}/{1}'.format(count,labels_count))
+    filename = str(index) + ".txt"
+    filepath = os.path.join(ava_comment_path, filename)
+    with open(filepath,encoding = "ISO-8859-1") as f:
+        content = f.readlines()
+        stripped_contents = [ string.strip() for string in content ]
+        comments_series.ix[index] = stripped_contents
+    count = count + 1
+ava_table.loc[:,'comments'] = comments_series
