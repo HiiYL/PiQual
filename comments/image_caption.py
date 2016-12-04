@@ -116,4 +116,7 @@ model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
 # containing a categorical encoding (0s and 1s) of the next word in the corresponding
 # partial caption.
 model.fit([images, partial_captions], next_words, batch_size=16, nb_epoch=100)
+
+
+model.fit([images, partial_captions], texts_indices, batch_size=16, nb_epoch=100)
 out = model.predict([X_train[:2], np.random.rand(2,16)])

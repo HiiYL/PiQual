@@ -16,20 +16,28 @@ from keras.utils.np_utils import to_categorical
 from keras.optimizers import SGD
 
 from keras.callbacks import CSVLogger, ReduceLROnPlateau
-from keras.layers.pooling import GlobalAveragePooling1D,GlobalMaxPooling1D
+from keras.layers.pooling import GlobalAveragePooling1D,GlobalMaxPooling1D, MaxPooling1D
 
-max_features=20000
+from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, AveragePooling2D, ZeroPadding2D, Dropout, Flatten, merge, Reshape, Activation
+
+
+from keras.regularizers import l2, activity_l2
+
+max_features = 20000
 maxlen=100
-batch_size = 32
-embedding_dims = 50
-nb_filter = 250
-filter_length = 3
+batch_size = 64
+
 hidden_dims = 250
-nb_epoch = 20
+nb_epoch = 100
 
-embedding_dims = 50
+embedding_dims = 128
+delta = 1.0
 
-delta = 0.0
+# Convolution
+filter_length = 5
+nb_filter = 64
+pool_length = 4
+
 
 def tokenizeAndGenerateIndex(texts):
     tokenizer = Tokenizer(nb_words=max_features)
@@ -45,7 +53,9 @@ store = HDFStore('../dataset_h5/labels.h5')
 
 ava_table = store['labels_train']
 
-ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
+# ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
+
+ava_table = ava_table.sort_values(by="score")
 comments_train = ava_table.ix[:,'comments'].as_matrix()
 X_train = tokenizeAndGenerateIndex(comments_train)
 
@@ -62,14 +72,52 @@ Y_test = ava_test.ix[:, "good"].as_matrix()
 Y_test = to_categorical(Y_test, 2)
 
 
+question_input = Input(shape=(100,), dtype='int32')
+embedded_question = Embedding(input_dim=max_features,
+ output_dim=128, dropout=0.25,
+  input_length=100)(question_input)
+
+# embedded_question = Flatten()(embedded_question)
+encoded_question = GRU(128,W_regularizer=l2(0.5),U_regularizer=l2(0.1))(embedded_question)
+
+output = Dense(2, activation='softmax')(encoded_question)
+# question_input = Input(shape=(maxlen,), dtype='int32')
+# x = Embedding(input_dim=max_features,
+#  output_dim=embedding_dims, input_length=maxlen,
+#    dropout=0.25)(question_input)
+# # x = Convolution1D(nb_filter=nb_filter,
+# #                         filter_length=filter_length,
+# #                         border_mode='valid',
+# #                         activation='relu',
+# #                         subsample_length=1)(x)
+# # x = MaxPooling1D(pool_length=pool_length)(x)
+# x = GRU(embedding_dims,dropout_W = 0.3,dropout_U = 0.3)(x)
+# output = Dense(2, activation='softmax')(x)
+
+model = Model(input=question_input, output=output)
+# sgd = SGD(lr=0.01, decay=5e-4, momentum=0.9, nesterov=True, clipnorm=1., clipvalue=0.5)
+model.compile(loss='categorical_crossentropy',
+              optimizer='rmsprop',
+              metrics=['accuracy'])
+
+
+model.fit(X_train, Y_train,
+          batch_size=batch_size,
+          nb_epoch=nb_epoch,
+          validation_data=(X_test, Y_test))
+
+
+### CNN ###
+
+
 # model = Sequential()
 
 # # we start off with an efficient embedding layer which maps
 # # our vocab indices into embedding_dims dimensions
-# model.add(Embedding(max_features,
+# model.add(Embedding(max_features + 2,
 #                     embedding_dims,
 #                     input_length=maxlen,
-#                     dropout=0.2))
+#                     dropout=0.2, mask_zero=True))
 
 # # we add a Convolution1D, which will learn nb_filter
 # # word group filters of size filter_length:
@@ -98,41 +146,11 @@ Y_test = to_categorical(Y_test, 2)
 #           validation_data=(X_test, Y_test))
 
 
-
-question_input = Input(shape=(maxlen,), dtype='int32')
-embedded_question = Embedding(input_dim=max_features + 2,
- output_dim=embedding_dims, input_length=maxlen, dropout=0.5,
-  mask_zero=True)(question_input)
-encoded_question = GRU(embedding_dims,dropout_W = 0.3,dropout_U = 0.3)(embedded_question)
-output = Dense(2, activation='softmax')(encoded_question)
-
-model = Model(input=question_input, output=output)
-
-model.compile(loss='categorical_crossentropy',
-              optimizer='adam',
-              metrics=['accuracy'])
-
-
-model.fit(X_train, Y_train,
-          batch_size=batch_size,
-          nb_epoch=nb_epoch,
-          validation_data=(X_test, Y_test))
+### GRU ###
 
 
 
-# model = Sequential()
-# model.add(Embedding(max_features, 128, dropout=0.2))
-# model.add(GRU(128, dropout_W=0.2, dropout_U=0.2))  # try using a GRU instead, for fun
-# model.add(Dense(2, activation='softmax'))
 
-# # reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=2)
-
-# # sgd = SGD(lr=0.01, decay=5e-4, momentum=0.9, nesterov=True)
-# model.compile(loss='categorical_crossentropy',
-#               optimizer='adam',
-#               metrics=['acc'])
-
-# model.fit(X_train, Y_train,validation_data=(X_test,Y_test),nb_epoch=20, batch_size=32)
 
 
 # model = Sequential()
