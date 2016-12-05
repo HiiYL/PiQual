@@ -39,16 +39,19 @@ nb_filter = 64
 pool_length = 4
 
 
-GLOVE_DIR = "../../../Downloads/glove/"
+GLOVE_DIR = "glove/"
 
-def tokenizeAndGenerateIndex(texts):
-    tokenizer = Tokenizer(nb_words=max_features)
-    tokenizer.fit_on_texts(texts)
-    sequences = tokenizer.texts_to_sequences(texts)
-    word_index = tokenizer.word_index
-    print('Found %s unique tokens.' % len(word_index))
-    data = pad_sequences(sequences, maxlen=maxlen)
-    return data, word_index
+def tokenizeAndGenerateIndex(train, test):
+  merged = np.concatenate([train, test])
+  tokenizer = Tokenizer(nb_words=max_features)
+  tokenizer.fit_on_texts(merged)
+  sequences_train = tokenizer.texts_to_sequences(train)
+  sequences_test = tokenizer.texts_to_sequences(test)
+  word_index = tokenizer.word_index
+  print('Found %s unique tokens.' % len(word_index))
+  data_train = pad_sequences(sequences_train, maxlen=maxlen)
+  data_test = pad_sequences(sequences_test, maxlen=maxlen)
+  return data_train, data_test, word_index
 
 
 def generateIndexMappingToEmbedding():
@@ -68,14 +71,12 @@ def generateIndexMappingToEmbedding():
 
 store = HDFStore('../dataset_h5/labels.h5')
 
-
 ava_table = store['labels_train']
-
 # ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
 
 ava_table = ava_table.sort_values(by="score")
 comments_train = ava_table.ix[:,'comments'].as_matrix()
-X_train,train_word_index = tokenizeAndGenerateIndex(comments_train)
+
 
 Y_train = ava_table.ix[:, "good"].as_matrix()
 Y_train = to_categorical(Y_train, 2)
@@ -84,37 +85,48 @@ Y_train = to_categorical(Y_train, 2)
 
 ava_test = store['labels_test']
 comments_test = ava_test.ix[:,'comments'].as_matrix()
-X_test, test_word_index = tokenizeAndGenerateIndex(comments_test)
 
 Y_test = ava_test.ix[:, "good"].as_matrix()
 Y_test = to_categorical(Y_test, 2)
 
+X_train, X_test, word_index = tokenizeAndGenerateIndex(comments_train, comments_test)
 
 embeddings_index = generateIndexMappingToEmbedding()
 
-embedding_matrix = np.zeros((len(train_word_index) + 1, EMBEDDING_DIM))
-for word, i in train_word_index.items():
-  embedding_vector = embeddings_index.get(word)
-  if embedding_vector is not None:
-    # words not found in embedding index will be all-zeros.
-    embedding_matrix[i] = embedding_vector
+embedding_matrix = np.zeros((len(word_index) + 1, EMBEDDING_DIM))
+for word, i in word_index.items():
+    embedding_vector = embeddings_index.get(word)
+    if embedding_vector is not None:
+        # words not found in embedding index will be all-zeros.
+        embedding_matrix[i] = embedding_vector
 
 
-question_input = Input(shape=(100,), dtype='int32')
-# embedded_question = Embedding(input_dim=max_features,
-#  output_dim=EMBEDDING_DIM, dropout=0.25,
-#   input_length=100)(question_input)
-
-embedding_layer = Embedding(len(train_word_index) + 1,
+embedding_layer = Embedding(len(word_index) + 1,
                             EMBEDDING_DIM,
                             weights=[embedding_matrix],
                             input_length=maxlen,
-                            trainable=False)(question_input)
+                            trainable=False)
 
-# embedded_question = Flatten()(embedded_question)
-encoded_question = GRU(EMBEDDING_DIM,W_regularizer=l2(0.01),U_regularizer=l2(0.01))(embedding_layer)
+comment_input = Input(shape=(100,), dtype='int32')
+embedded_sequences = embedding_layer(comment_input)
+# x = GRU(EMBEDDING_DIM)(embedded_sequences) # 0.8013
+# x = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3)(embedded_sequences) #0.8109
 
-output = Dense(2, activation='softmax')(encoded_question)
+
+# x = Convolution1D(128, 5, activation='relu')(embedded_sequences)
+# x = MaxPooling1D(5)(x)
+# x = Convolution1D(128, 5, activation='relu')(x)
+# x = MaxPooling1D(5)(x)
+# x = Convolution1D(128, 5, activation='relu')(x)
+# x = MaxPooling1D(35)(x)  # global max pooling
+x = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3)(embedded_sequences)
+# x = Flatten()(x)
+# x = Dense(128, activation='relu')(x)
+# x = Dropout(0.5)(x)
+
+# x = Flatten()(embedded_sequences)
+preds = Dense(2, activation='softmax')(x)
+
 # question_input = Input(shape=(maxlen,), dtype='int32')
 # x = Embedding(input_dim=max_features,
 #  output_dim=EMBEDDING_DIM, input_length=maxlen,
@@ -128,7 +140,7 @@ output = Dense(2, activation='softmax')(encoded_question)
 # x = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3)(x)
 # output = Dense(2, activation='softmax')(x)
 
-model = Model(input=question_input, output=output)
+model = Model(input=comment_input, output=preds)
 # sgd = SGD(lr=0.01, decay=5e-4, momentum=0.9, nesterov=True, clipnorm=1., clipvalue=0.5)
 model.compile(loss='categorical_crossentropy',
               optimizer='rmsprop',
@@ -136,6 +148,6 @@ model.compile(loss='categorical_crossentropy',
 
 
 model.fit(X_train, Y_train,
-          batch_size=batch_size,
-          nb_epoch=nb_epoch,
+          batch_size=128,
+          nb_epoch=20,
           validation_data=(X_test, Y_test))
