@@ -30,7 +30,7 @@ batch_size = 64
 hidden_dims = 250
 nb_epoch = 100
 
-embedding_dims = 128
+EMBEDDING_DIM = 100
 delta = 1.0
 
 # Convolution
@@ -39,6 +39,8 @@ nb_filter = 64
 pool_length = 4
 
 
+GLOVE_DIR = "../../../Downloads/glove/"
+
 def tokenizeAndGenerateIndex(texts):
     tokenizer = Tokenizer(nb_words=max_features)
     tokenizer.fit_on_texts(texts)
@@ -46,7 +48,23 @@ def tokenizeAndGenerateIndex(texts):
     word_index = tokenizer.word_index
     print('Found %s unique tokens.' % len(word_index))
     data = pad_sequences(sequences, maxlen=maxlen)
-    return data
+    return data, word_index
+
+
+def generateIndexMappingToEmbedding():
+  embeddings_index = {}
+  f = open(os.path.join(GLOVE_DIR, 'glove.6B.100d.txt'))
+  for line in f:
+      values = line.split()
+      word = values[0]
+      coefs = np.asarray(values[1:], dtype='float32')
+      embeddings_index[word] = coefs
+  f.close()
+
+  print('Found %s word vectors.' % len(embeddings_index))
+  return embeddings_index
+  
+
 
 store = HDFStore('../dataset_h5/labels.h5')
 
@@ -57,7 +75,7 @@ ava_table = store['labels_train']
 
 ava_table = ava_table.sort_values(by="score")
 comments_train = ava_table.ix[:,'comments'].as_matrix()
-X_train = tokenizeAndGenerateIndex(comments_train)
+X_train,train_word_index = tokenizeAndGenerateIndex(comments_train)
 
 Y_train = ava_table.ix[:, "good"].as_matrix()
 Y_train = to_categorical(Y_train, 2)
@@ -66,24 +84,40 @@ Y_train = to_categorical(Y_train, 2)
 
 ava_test = store['labels_test']
 comments_test = ava_test.ix[:,'comments'].as_matrix()
-X_test = tokenizeAndGenerateIndex(comments_test)
+X_test, test_word_index = tokenizeAndGenerateIndex(comments_test)
 
 Y_test = ava_test.ix[:, "good"].as_matrix()
 Y_test = to_categorical(Y_test, 2)
 
 
+embeddings_index = generateIndexMappingToEmbedding()
+
+embedding_matrix = np.zeros((len(train_word_index) + 1, EMBEDDING_DIM))
+for word, i in train_word_index.items():
+  embedding_vector = embeddings_index.get(word)
+  if embedding_vector is not None:
+    # words not found in embedding index will be all-zeros.
+    embedding_matrix[i] = embedding_vector
+
+
 question_input = Input(shape=(100,), dtype='int32')
-embedded_question = Embedding(input_dim=max_features,
- output_dim=128, dropout=0.25,
-  input_length=100)(question_input)
+# embedded_question = Embedding(input_dim=max_features,
+#  output_dim=EMBEDDING_DIM, dropout=0.25,
+#   input_length=100)(question_input)
+
+embedding_layer = Embedding(len(train_word_index) + 1,
+                            EMBEDDING_DIM,
+                            weights=[embedding_matrix],
+                            input_length=maxlen,
+                            trainable=False)(question_input)
 
 # embedded_question = Flatten()(embedded_question)
-encoded_question = GRU(128,W_regularizer=l2(0.5),U_regularizer=l2(0.1))(embedded_question)
+encoded_question = GRU(EMBEDDING_DIM,W_regularizer=l2(0.01),U_regularizer=l2(0.01))(embedding_layer)
 
 output = Dense(2, activation='softmax')(encoded_question)
 # question_input = Input(shape=(maxlen,), dtype='int32')
 # x = Embedding(input_dim=max_features,
-#  output_dim=embedding_dims, input_length=maxlen,
+#  output_dim=EMBEDDING_DIM, input_length=maxlen,
 #    dropout=0.25)(question_input)
 # # x = Convolution1D(nb_filter=nb_filter,
 # #                         filter_length=filter_length,
@@ -91,7 +125,7 @@ output = Dense(2, activation='softmax')(encoded_question)
 # #                         activation='relu',
 # #                         subsample_length=1)(x)
 # # x = MaxPooling1D(pool_length=pool_length)(x)
-# x = GRU(embedding_dims,dropout_W = 0.3,dropout_U = 0.3)(x)
+# x = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3)(x)
 # output = Dense(2, activation='softmax')(x)
 
 model = Model(input=question_input, output=output)
@@ -105,72 +139,3 @@ model.fit(X_train, Y_train,
           batch_size=batch_size,
           nb_epoch=nb_epoch,
           validation_data=(X_test, Y_test))
-
-
-### CNN ###
-
-
-# model = Sequential()
-
-# # we start off with an efficient embedding layer which maps
-# # our vocab indices into embedding_dims dimensions
-# model.add(Embedding(max_features + 2,
-#                     embedding_dims,
-#                     input_length=maxlen,
-#                     dropout=0.2, mask_zero=True))
-
-# # we add a Convolution1D, which will learn nb_filter
-# # word group filters of size filter_length:
-# model.add(Convolution1D(nb_filter=nb_filter,
-#                         filter_length=filter_length,
-#                         border_mode='valid',
-#                         activation='relu',
-#                         subsample_length=1))
-# # we use max pooling:
-# model.add(GlobalMaxPooling1D())
-
-# # We add a vanilla hidden layer:
-# model.add(Dense(hidden_dims, activation='relu'))
-# model.add(Dropout(0.2))
-
-# model.add(Dense(2, activation='softmax'))
-
-# model.compile(loss='categorical_crossentropy',
-#               optimizer='adam',
-#               metrics=['accuracy'])
-
-
-# model.fit(X_train, Y_train,
-#           batch_size=batch_size,
-#           nb_epoch=nb_epoch,
-#           validation_data=(X_test, Y_test))
-
-
-### GRU ###
-
-
-
-
-
-
-# model = Sequential()
-
-# model.add(Embedding(max_features,
-#                     embedding_dims,
-#                     input_length=maxlen))
-
-# # we add a GlobalAveragePooling1D, which will average the embeddings
-# # of all words in the document
-# model.add(GlobalAveragePooling1D())
-
-# # We project onto a single unit output layer, and squash it with a sigmoid:
-# model.add(Dense(2, activation='softmax'))
-
-# model.compile(loss='categorical_crossentropy',
-#               optimizer='adam',
-#               metrics=['accuracy'])
-
-# model.fit(X_train, Y_train,
-#           batch_size=32,
-#           nb_epoch=10,
-#           validation_data=(X_test, Y_test))
