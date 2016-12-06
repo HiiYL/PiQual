@@ -3,7 +3,7 @@ from keras.models import model_from_json
 
 from keras.applications.inception_v3 import InceptionV3
 from keras.callbacks import ModelCheckpoint
-from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D,Convolution1D
+from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 
 from keras.layers import Dense, Activation
 from keras.models import Model
@@ -11,7 +11,7 @@ from keras.models import Model
 from keras.utils.np_utils import to_categorical
 from keras.callbacks import CSVLogger, ReduceLROnPlateau
 
-from keras.layers.pooling import GlobalAveragePooling2D, GlobalMaxPooling2D,GlobalMaxPooling1D
+from keras.layers.pooling import GlobalAveragePooling2D, GlobalMaxPooling2D
 
 from keras.optimizers import SGD
 from keras.models import load_model
@@ -35,77 +35,18 @@ sys.setrecursionlimit(10000)
 from scipy.misc import imread, imresize
 
 from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, AveragePooling2D, ZeroPadding2D, Dropout, Flatten, merge, Reshape, Activation
-from keras.layers import Input, Embedding, LSTM, Dense, Activation, GRU,Convolution1D,Dropout
 from keras.models import Model
 from keras.regularizers import l2
-from keras.optimizers import SGD, RMSprop
+from keras.optimizers import SGD
 from googlenet_custom_layers import PoolHelper,LRN
 
 from datetime import datetime
 
-from keras.preprocessing.text import Tokenizer
-from keras.preprocessing.sequence import pad_sequences
 
-max_features = 20000
-maxlen=100
-batch_size = 64
-
-hidden_dims = 250
-nb_epoch = 100
-
-EMBEDDING_DIM = 300
-delta = 1.0
-
-# Convolution
-filter_length = 5
-nb_filter = 64
-pool_length = 4
-
-
-GLOVE_DIR = "../comments/glove/"
-
-def tokenizeAndGenerateIndex(train, test):
-  merged = np.concatenate([train, test])
-  tokenizer = Tokenizer(nb_words=max_features)
-  tokenizer.fit_on_texts(merged)
-  sequences_train = tokenizer.texts_to_sequences(train)
-  sequences_test = tokenizer.texts_to_sequences(test)
-  word_index = tokenizer.word_index
-  print('Found %s unique tokens.' % len(word_index))
-  data_train = pad_sequences(sequences_train, maxlen=maxlen)
-  data_test = pad_sequences(sequences_test, maxlen=maxlen)
-  return data_train, data_test, word_index
-
-
-def generateIndexMappingToEmbedding():
-  embeddings_index = {}
-  f = open(os.path.join(GLOVE_DIR, 'glove.6B.{}d.txt'.format(EMBEDDING_DIM)))
-  for line in f:
-      values = line.split()
-      word = values[0]
-      coefs = np.asarray(values[1:], dtype='float32')
-      embeddings_index[word] = coefs
-  f.close()
-
-  print('Found %s word vectors.' % len(embeddings_index))
-  return embeddings_index
-
-
-def create_googlenet(embedding_layer,weights_path=None, heatmap=False):
+def create_googlenet(weights_path=None, heatmap=False):
     # creates GoogLeNet a.k.a. Inception v1 (Szegedy, 2015)
-
-
+    
     input = Input(shape=(3, 224, 224))
-
-
-    comment_input = Input(shape=(maxlen,), dtype='int32')
-    embedded_sequences = embedding_layer(comment_input)
-
-    x_text_aesthetics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3)(embedded_sequences)
-
-    x_text_semantics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3)(embedded_sequences)
-
-
     
     conv1_7x7_s2 = Convolution2D(64,7,7,subsample=(2,2),border_mode='same',activation='relu',name='conv1/7x7_s2',W_regularizer=l2(0.0002))(input)
     
@@ -238,6 +179,9 @@ def create_googlenet(embedding_layer,weights_path=None, heatmap=False):
     inception_4d_output = merge([inception_4d_1x1,inception_4d_3x3,inception_4d_5x5,inception_4d_pool_proj],mode='concat',concat_axis=1,name='inception_4d/output')
     
     
+
+    
+    
     inception_4e_1x1_aesthetics = Convolution2D(256,1,1,border_mode='same',activation='relu',name='inception_4e/1x1_aesthetics',W_regularizer=l2(0.0002))(inception_4d_output)
     
     inception_4e_3x3_reduce_aesthetics = Convolution2D(160,1,1,border_mode='same',activation='relu',name='inception_4e/3x3_reduce_aesthetics',W_regularizer=l2(0.0002))(inception_4d_output)
@@ -256,11 +200,9 @@ def create_googlenet(embedding_layer,weights_path=None, heatmap=False):
 
     conv_output_aesthetics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_aesthetics',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output_aesthetics)
 
-    x_aesthetics = Flatten()(conv_output_aesthetics)
+    x_aesthetics = GlobalAveragePooling2D()(conv_output_aesthetics)
 
-    x_aesthetics = merge([x_aesthetics,x_text_aesthetics] ,mode='concat',concat_axis=1)
-
-    output_aesthetics = Dense(2, activation = 'softmax', name="output_aesthetic")(x_aesthetics)
+    output_aesthetics = Dense(10, activation = 'softmax', name="output_aesthetics")(x_aesthetics)
 
 
     inception_4e_1x1_semantics = Convolution2D(256,1,1,border_mode='same',activation='relu',name='inception_4e/1x1_semantics',W_regularizer=l2(0.0002))(inception_4d_output)
@@ -281,13 +223,14 @@ def create_googlenet(embedding_layer,weights_path=None, heatmap=False):
 
     conv_output_semantics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_semantics',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output_semantics)
 
-    x_semantics = Flatten()(conv_output_semantics)
+    x_semantics = GlobalAveragePooling2D()(conv_output_semantics)
 
-    x_semantics = merge([x_semantics,x_text_semantics] ,mode='concat',concat_axis=1)
+    output_semantics = Dense(65, activation = 'softmax', name="output_semantics")(x_semantics)
 
-    output_semantics = Dense(65, activation = 'softmax', name="output_semantic")(x_semantics)
-    
-    googlenet = Model(input=[input, comment_input], output=[output_aesthetics,output_semantics])
+    if heatmap:
+        googlenet = Model(input=input, output=[output_aesthetics,output_semantics, conv_output_aesthetics, conv_output_semantics])
+    else:
+        googlenet = Model(input=input, output=[output_aesthetics,output_semantics])
     
     if weights_path:
         googlenet.load_weights(weights_path,by_name=True)
@@ -367,7 +310,14 @@ def read_and_generate_heatmap(input_path, output_path):
         cv2.imwrite('output/{}_{}.jpg'.format(file_name, semantic_tags[nth_top_semantic]), temp)
 
 
+def getDistribution(dataframe):
+  ratings_matrix = dataframe.ix[:,:10]
+  sum_of_ratings = (dataframe.ix[:,:10]).sum(axis=1)
+  normalized_score_distribution = ratings_matrix.div(sum_of_ratings,axis='index')
+  return normalized_score_distribution.as_matrix()
 
+
+model = create_googlenet('googlenet_aesthetics_weights.h5', heatmap=False)
 
 delta = 0.0
 store = HDFStore('../dataset_h5/labels.h5','r')
@@ -383,50 +333,22 @@ X_train = h5f['data_train']
 
 #X_train = X_train.astype('float32')
 
-Y_train = ava_table.ix[:, "good"].as_matrix()
-Y_train = to_categorical(Y_train, 2)
+Y_train = getDistribution(ava_table)
 
 Y_train_semantics = to_categorical(ava_table.ix[:,10:12].as_matrix())[:,1:]
 
 X_test = h5f['data_test']
 ava_test = store['labels_test']
-Y_test = ava_test.ix[:, "good"].as_matrix()
-Y_test = to_categorical(Y_test, 2)
+Y_test = getDistribution(ava_test)
 
 Y_test_semantics = to_categorical(ava_test.ix[:,10:12].as_matrix())[:,1:]
 
-
-
-comments_train = ava_table.ix[:,'comments'].as_matrix()
-comments_test = ava_test.ix[:,'comments'].as_matrix()
-
-
-X_train_text, X_test_text, word_index = tokenizeAndGenerateIndex(comments_train, comments_test)
-embeddings_index = generateIndexMappingToEmbedding()
-embedding_matrix = np.zeros((len(word_index) + 1, EMBEDDING_DIM))
-for word, i in word_index.items():
-    embedding_vector = embeddings_index.get(word)
-    if embedding_vector is not None:
-        # words not found in embedding index will be all-zeros.
-        embedding_matrix[i] = embedding_vector
-
-
-embedding_layer = Embedding(len(word_index) + 1,
-                            EMBEDDING_DIM,
-                            weights=[embedding_matrix],
-                            input_length=maxlen,
-                            trainable=False)
-
-model = create_googlenet(embedding_layer, 'googlenet_aesthetics_weights_joint.h5', heatmap=False)
-
 sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
-
-rmsProp = RMSprop(lr=0.00001, rho=0.9, epsilon=1e-08, decay=0.0)
-model.compile(optimizer=rmsProp,loss='categorical_crossentropy', metrics=['accuracy'])
+model.compile(optimizer=sgd,loss='kld', metrics=['accuracy'])
 
 time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-checkpointer = ModelCheckpoint(filepath="googlenet_aesthetics_weights{}.h5".format(time_now), verbose=1, save_best_only=True)
+checkpointer = ModelCheckpoint(filepath="googlenet_aesthetics_weights_distribution_{}.h5".format(time_now), verbose=1, save_best_only=True)
 
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=3)
 
@@ -434,8 +356,7 @@ csv_logger = CSVLogger('training_gmp_aesthetics{}.log'.format(time_now))
 
 
 # class_weight = {0 : 0.67, 1: 0.33}
-model.fit([X_train, X_train_text],[Y_train,Y_train_semantics],nb_epoch=20, batch_size=32, shuffle="batch",
- validation_data=([X_test,X_test_text], [Y_test,Y_test_semantics]), callbacks=[csv_logger,checkpointer])#,reduce_lr])#,class_weight = class_weight)
+model.fit(X_train,[Y_train,Y_train_semantics],nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, [Y_test,Y_test_semantics]), callbacks=[csv_logger,checkpointer,reduce_lr])#,class_weight = class_weight)
 
 # from keras.utils.visualize_util import plot
 # plot(model, to_file='model.png')
