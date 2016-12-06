@@ -73,6 +73,12 @@ def getDistribution(dataframe):
   normalized_score_distribution = ratings_matrix.div(sum_of_ratings,axis='index')
   return normalized_score_distribution.as_matrix()
 
+def getBinaryDistribution(dataframe):
+  ratings_matrix = pd.concat([dataframe.ix[:,:5].sum(axis=1),dataframe.ix[:,5:10].sum(axis=1)], axis=1)
+  # ratings_matrix = dataframe.ix[:,:10]
+  sum_of_ratings = (dataframe.ix[:,:10]).sum(axis=1)
+  normalized_score_distribution = ratings_matrix.div(sum_of_ratings,axis='index')
+  return normalized_score_distribution.as_matrix()
 
 store = HDFStore('../dataset_h5/labels.h5')
 
@@ -83,14 +89,14 @@ ava_table = ava_table.sort_values(by="score")
 comments_train = ava_table.ix[:,'comments'].as_matrix()
 
 
-Y_train = getDistribution(ava_table)
+Y_train = getBinaryDistribution(ava_table)
 
 
 
 ava_test = store['labels_test']
 comments_test = ava_test.ix[:,'comments'].as_matrix()
 
-Y_test = getDistribution(ava_test)
+Y_test = getBinaryDistribution(ava_test)
 
 X_train, X_test, word_index = tokenizeAndGenerateIndex(comments_train, comments_test)
 
@@ -128,7 +134,7 @@ x = GRU(EMBEDDING_DIM)(embedded_sequences)
 # x = Dropout(0.5)(x)
 
 # x = Flatten()(embedded_sequences)
-preds = Dense(10, activation='softmax')(x)
+preds = Dense(2, activation='softmax')(x)
 
 # question_input = Input(shape=(maxlen,), dtype='int32')
 # x = Embedding(input_dim=max_features,
@@ -162,7 +168,7 @@ score = (out * weights).sum(axis=1)
 
 good = [ 1 if row > 5 else 0 for row in score]
 
-
+good = np.argmax(out,axis=1)
 truth_good = ava_test.ix[:, "good"].as_matrix()
 
 np.sum(good == truth_good) / len(good)
