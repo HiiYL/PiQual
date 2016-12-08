@@ -199,7 +199,7 @@ def create_googlenet(weights_path=None, heatmap=False):
     inception_4e_output = merge([inception_4e_1x1,inception_4e_3x3,inception_4e_5x5,inception_4e_pool_proj],mode='concat',concat_axis=1,name='semantic_inception_4e/output')
     
 
-    semantic_conv_output = Convolution2D(1024, 3, 3, activation='relu',name='semantic_conv_6_1_',border_mode = 'same')(inception_4e_output)
+    semantic_conv_output = Convolution2D(1024, 3, 3, activation='relu',name='semantic_conv_6_1',border_mode = 'same')(inception_4e_output)
 
 
     # x = GlobalAveragePooling2D()(semantic_conv_output)
@@ -368,7 +368,7 @@ def create_googlenet(weights_path=None, heatmap=False):
 
     x = GlobalAveragePooling2D()(merged_conv)
 
-    main_output = Dense(2, activation = 'softmax', name="main_output")(x)
+    main_output = Dense(10, activation = 'softmax', name="main_output_")(x)
     
     if heatmap:
         googlenet = Model(input=input, output=[main_output, conv_output])
@@ -376,15 +376,13 @@ def create_googlenet(weights_path=None, heatmap=False):
         googlenet = Model(input=input, output=main_output)
     
     if weights_path:
-        googlenet.load_weights(weights_path,by_name=True)
         googlenet.load_weights('named_googlenet_semantics_weights.h5', by_name=True) ## Load semantic weights
+        googlenet.load_weights(weights_path,by_name=True)
         for i, layer in enumerate(googlenet.layers):
             if 'semantic' in layer.name:
                 # print("{} - {}".format(i, layer.name))
                 layer.trainable = False
 
-
-    
     return googlenet
 
 def process_image(image):
@@ -434,6 +432,12 @@ def read_and_generate_heatmap(input_path, output_path):
     cv2.imwrite(output_path, temp)
 
 
+def getDistribution(dataframe):
+    ratings_matrix = dataframe.ix[:,:10]
+    sum_of_ratings = (dataframe.ix[:,:10]).sum(axis=1)
+    normalized_score_distribution = ratings_matrix.div(sum_of_ratings,axis='index')
+    return normalized_score_distribution.as_matrix()
+
 model = create_googlenet('googlenet_aesthetics_weights.h5', heatmap=False)
 
 delta = 0.0
@@ -450,16 +454,20 @@ X_train = h5f['data_train']
 
 #X_train = X_train.astype('float32')
 
-Y_train = ava_table.ix[:, "good"].as_matrix()
-Y_train = to_categorical(Y_train, 2)
+# Y_train = ava_table.ix[:, "good"].as_matrix()
+# Y_train = to_categorical(Y_train, 2)
+
+Y_train = getDistribution(ava_table)
 
 X_test = h5f['data_test']
 ava_test = store['labels_test']
-Y_test = ava_test.ix[:, "good"].as_matrix()
-Y_test = to_categorical(Y_test, 2)
+# Y_test = ava_test.ix[:, "good"].as_matrix()
+# Y_test = to_categorical(Y_test, 2)
+
+Y_test = getDistribution(ava_test)
 
 sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
-model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
+model.compile(optimizer=sgd,loss='kld', metrics=['accuracy'])
 
 time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
