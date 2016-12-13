@@ -1,15 +1,14 @@
 from googlenet_custom_layers import PoolHelper,LRN
 from keras.models import model_from_json
 
-from keras.applications.inception_v3 import InceptionV3
-from keras.callbacks import ModelCheckpoint
+from keras.applications.inception_v3 import InceptionV3 
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 
 from keras.layers import Dense, Activation
 from keras.models import Model
 
 from keras.utils.np_utils import to_categorical
-from keras.callbacks import CSVLogger, ReduceLROnPlateau
+from keras.callbacks import CSVLogger, ReduceLROnPlateau,ModelCheckpoint
 
 from keras.layers.pooling import GlobalAveragePooling2D, GlobalMaxPooling2D
 

@@ -256,7 +256,7 @@ def create_googlenet(embedding_layer,weights_path=None, heatmap=False):
 
     conv_output_aesthetics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_aesthetics',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output_aesthetics)
 
-    x_aesthetics = Flatten()(conv_output_aesthetics)
+    x_aesthetics = GlobalAveragePooling2D()(conv_output_aesthetics)
 
     x_aesthetics = merge([x_aesthetics,x_text_aesthetics] ,mode='concat',concat_axis=1)
 
@@ -281,7 +281,7 @@ def create_googlenet(embedding_layer,weights_path=None, heatmap=False):
 
     conv_output_semantics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_semantics',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output_semantics)
 
-    x_semantics = Flatten()(conv_output_semantics)
+    x_semantics = GlobalAveragePooling2D()(conv_output_semantics)
 
     x_semantics = merge([x_semantics,x_text_semantics] ,mode='concat',concat_axis=1)
 

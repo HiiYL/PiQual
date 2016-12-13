@@ -13,7 +13,7 @@ from keras.callbacks import CSVLogger, ReduceLROnPlateau
 
 from keras.layers.pooling import GlobalAveragePooling2D, GlobalMaxPooling2D
 
-from keras.optimizers import SGD
+from keras.optimizers import SGD,RMSprop
 from keras.models import load_model
 
 import cv2
@@ -317,7 +317,7 @@ def getDistribution(dataframe):
   return normalized_score_distribution.as_matrix()
 
 
-model = create_googlenet('googlenet_aesthetics_weights.h5', heatmap=False)
+
 
 delta = 0.0
 store = HDFStore('../dataset_h5/labels.h5','r')
@@ -343,8 +343,11 @@ Y_test = getDistribution(ava_test)
 
 Y_test_semantics = to_categorical(ava_test.ix[:,10:12].as_matrix())[:,1:]
 
-sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
-model.compile(optimizer=sgd,loss='kld', metrics=['accuracy'])
+
+model = create_googlenet('googlenet_aesthetics_weights.h5', heatmap=False)
+#sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
+rmsProp = RMSprop(lr=0.00001, rho=0.9, epsilon=1e-08, decay=0.0, clipnorm=1., clipvalue=0.5)
+model.compile(optimizer=rmsProp,loss='kld', metrics=['accuracy'],loss_weights=[1., 0.2])
 
 time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -390,3 +393,15 @@ output_dir = "output/"
 for file in os.listdir(input_images_dir):
     if 'jpg' in file:
         read_and_generate_heatmap(input_images_dir + file, output_dir + file)
+
+
+out = model.predict(X_test)
+weights = np.array([1,2,3,4,5,6,7,8,9,10])
+score = (out * weights).sum(axis=1)
+
+good = [ 1 if row >= 5 else 0 for row in score]
+
+
+truth_good = ava_test.ix[:, "good"].as_matrix()
+
+np.sum(good == truth_good) / len(good)
