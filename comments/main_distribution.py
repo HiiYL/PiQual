@@ -20,6 +20,8 @@ from keras.layers.pooling import GlobalAveragePooling1D,GlobalMaxPooling1D, MaxP
 
 from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, AveragePooling2D, ZeroPadding2D, Dropout, Flatten, merge, Reshape, Activation
 
+from keras.callbacks import CSVLogger, ReduceLROnPlateau,ModelCheckpoint
+
 
 from keras.regularizers import l2, activity_l2
 
@@ -30,7 +32,7 @@ batch_size = 64
 hidden_dims = 250
 nb_epoch = 100
 
-EMBEDDING_DIM = 100
+EMBEDDING_DIM = 300
 delta = 1.0
 
 # Convolution
@@ -89,14 +91,14 @@ ava_table = ava_table.sort_values(by="score")
 comments_train = ava_table.ix[:,'comments'].as_matrix()
 
 
-Y_train = getBinaryDistribution(ava_table)
+Y_train = getDistribution(ava_table)
 
 
 
 ava_test = store['labels_test']
 comments_test = ava_test.ix[:,'comments'].as_matrix()
 
-Y_test = getBinaryDistribution(ava_test)
+Y_test = getDistribution(ava_test)
 
 X_train, X_test, word_index = tokenizeAndGenerateIndex(comments_train, comments_test)
 
@@ -128,13 +130,13 @@ embedded_sequences = embedding_layer(comment_input)
 # x = MaxPooling1D(5)(x)
 # x = Convolution1D(128, 5, activation='relu')(x)
 # x = MaxPooling1D(35)(x)  # global max pooling
-x = GRU(EMBEDDING_DIM)(embedded_sequences)
+x = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3)(embedded_sequences)
 # x = Flatten()(x)
 # x = Dense(128, activation='relu')(x)
 # x = Dropout(0.5)(x)
 
 # x = Flatten()(embedded_sequences)
-preds = Dense(2, activation='softmax')(x)
+preds = Dense(10, activation='softmax')(x)
 
 # question_input = Input(shape=(maxlen,), dtype='int32')
 # x = Embedding(input_dim=max_features,
@@ -151,25 +153,41 @@ preds = Dense(2, activation='softmax')(x)
 
 model = Model(input=comment_input, output=preds)
 # sgd = SGD(lr=0.01, decay=5e-4, momentum=0.9, nesterov=True, clipnorm=1., clipvalue=0.5)
-model.compile(loss='categorical_crossentropy',
+model.compile(loss='kld',
               optimizer='rmsprop',
               metrics=['accuracy'])
 
 
+time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+checkpointer = ModelCheckpoint(filepath="text_distribution_weights{}.h5".format(time_now), verbose=1, save_best_only=True)
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=2)
+csv_logger = CSVLogger('training_distribution_text{}.log'.format(time_now))
+
 model.fit(X_train, Y_train,
           batch_size=128,
           nb_epoch=20,
-          validation_data=(X_test, Y_test))
+          validation_data=(X_test, Y_test)
+          , callbacks=[checkpointer, reduce_lr, csv_logger])
 
 
 out = model.predict(X_test)
 weights = np.array([1,2,3,4,5,6,7,8,9,10])
 score = (out * weights).sum(axis=1)
 
-good = [ 1 if row > 5 else 0 for row in score]
+good = [ 1 if row >= 5 else 0 for row in score]
 
-good = np.argmax(out,axis=1)
+
 truth_good = ava_test.ix[:, "good"].as_matrix()
 
 np.sum(good == truth_good) / len(good)
 
+
+
+
+
+
+
+good = np.argmax(out,axis=1)
+good_truth = ava_test.ix[:, "good"].as_matrix()
+
+np.sum(good == truth_good) / len(good)

@@ -42,12 +42,72 @@ from googlenet_custom_layers import PoolHelper,LRN
 
 from datetime import datetime
 
+from keras.preprocessing.text import Tokenizer
+from keras.preprocessing.sequence import pad_sequences
 
-def create_googlenet(weights_path=None, heatmap=False):
+from keras.layers import Input, Embedding, LSTM, Dense, Activation, GRU,Convolution1D,Dropout
+
+
+max_features = 20000
+maxlen=100
+batch_size = 64
+
+hidden_dims = 250
+nb_epoch = 100
+
+EMBEDDING_DIM = 300
+delta = 1.0
+
+# Convolution
+filter_length = 5
+nb_filter = 64
+pool_length = 4
+
+
+GLOVE_DIR = "../comments/glove/"
+
+def tokenizeAndGenerateIndex(train, test):
+  merged = np.concatenate([train, test])
+  tokenizer = Tokenizer(nb_words=max_features)
+  tokenizer.fit_on_texts(merged)
+  sequences_train = tokenizer.texts_to_sequences(train)
+  sequences_test = tokenizer.texts_to_sequences(test)
+  word_index = tokenizer.word_index
+  print('Found %s unique tokens.' % len(word_index))
+  data_train = pad_sequences(sequences_train, maxlen=maxlen)
+  data_test = pad_sequences(sequences_test, maxlen=maxlen)
+  return data_train, data_test, word_index
+
+
+def generateIndexMappingToEmbedding():
+  embeddings_index = {}
+  f = open(os.path.join(GLOVE_DIR, 'glove.6B.{}d.txt'.format(EMBEDDING_DIM)))
+  for line in f:
+      values = line.split()
+      word = values[0]
+      coefs = np.asarray(values[1:], dtype='float32')
+      embeddings_index[word] = coefs
+  f.close()
+
+  print('Found %s word vectors.' % len(embeddings_index))
+  return embeddings_index
+  
+
+def create_googlenet_text(embedding_layer,weights_path=None, heatmap=False):
+
+
+    comment_input = Input(shape=(100,), dtype='int32')
+
+    embedded_sequences = embedding_layer(comment_input)
+
+    text_gru = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3, trainable=False, name="gru")(embedded_sequences)
+
     # creates GoogLeNet a.k.a. Inception v1 (Szegedy, 2015)
     
+   
+
     input = Input(shape=(3, 224, 224))
-    
+
     conv1_7x7_s2 = Convolution2D(64,7,7,subsample=(2,2),border_mode='same',activation='relu',name='conv1/7x7_s2',W_regularizer=l2(0.0002))(input)
     
     conv1_zero_pad = ZeroPadding2D(padding=(1, 1))(conv1_7x7_s2)
@@ -203,16 +263,24 @@ def create_googlenet(weights_path=None, heatmap=False):
 
     x = GlobalAveragePooling2D()(conv_output)
 
-    main_output = Dense(10, activation = 'softmax', name="main_output")(x)
+    merge_aesthetic_text = merge([x,text_gru],mode='concat',concat_axis=1,name='inception_4e/output_')
+
+    main_output = Dense(2, activation = 'softmax', name="main_output__")(merge_aesthetic_text)
     
     if heatmap:
-        googlenet = Model(input=input, output=[main_output, conv_output])
+        googlenet = Model(input=[input, comment_input], output=[main_output, conv_output])
     else:
-        googlenet = Model(input=input, output=main_output)
+        googlenet = Model(input=[input, comment_input], output=main_output)
     
     if weights_path:
-        googlenet.load_weights(weights_path,by_name=True)
-    
+        googlenet.load_weights('../comments/text_binary_weights2016-12-07 09:31:43.h5')
+        googlenet.load_weights('googlenet_aesthetics_weights.h5', by_name=True) ## Load semantic weights
+        # googlenet.load_weights(weights_path,by_name=True)
+        # for i, layer in enumerate(googlenet.layers):
+        #     if 'semantic' in layer.name:
+        #         # print("{} - {}".format(i, layer.name))
+        #         layer.trainable = False
+
     return googlenet
 
 def process_image(image):
@@ -263,11 +331,12 @@ def read_and_generate_heatmap(input_path, output_path):
 
 
 def getDistribution(dataframe):
+    ratings_matrix = dataframe.ix[:,:10]
     sum_of_ratings = (dataframe.ix[:,:10]).sum(axis=1)
     normalized_score_distribution = ratings_matrix.div(sum_of_ratings,axis='index')
     return normalized_score_distribution.as_matrix()
 
-model = create_googlenet('googlenet_weights.h5', heatmap=False)
+
 
 delta = 0.0
 store = HDFStore('../dataset_h5/labels.h5','r')
@@ -275,55 +344,93 @@ store = HDFStore('../dataset_h5/labels.h5','r')
 ava_table = store['labels_train']
 
 ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
+# X_train = np.hstack(X).reshape(10000,224,224,3)
+# X = pickle.load( open("images_224.p", "rb"))
 h5f = h5py.File('../dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
 X_train = h5f['data_train']
+#X_train = np.hstack(X).reshape(3,224,224,16160).T
 
-ava_table = store['labels_train']
-ratings_matrix = ava_table.ix[:,:10]
-normalized_score_distribution = ratings_matrix.div(sum_of_ratings,axis='index')
+#X_train = X_train.astype('float32')
+
+# Y_train = ava_table.ix[:, "good"].as_matrix()
+# Y_train = to_categorical(Y_train, 2)
+
 Y_train = getDistribution(ava_table)
 
 X_test = h5f['data_test']
 ava_test = store['labels_test']
+# Y_test = ava_test.ix[:, "good"].as_matrix()
+# Y_test = to_categorical(Y_test, 2)
+
+Y_train = ava_table.ix[:, "good"].as_matrix()
+Y_train = to_categorical(Y_train, 2)
+
 Y_test = ava_test.ix[:, "good"].as_matrix()
-Y_test = getDistribution(ava_test)
+Y_test = to_categorical(Y_test, 2)
+
+comments_train = ava_table.ix[:,'comments'].as_matrix()
+comments_test = ava_test.ix[:,'comments'].as_matrix()
+
+X_train_text, X_test_text, word_index = tokenizeAndGenerateIndex(comments_train, comments_test)
+
+embeddings_index = generateIndexMappingToEmbedding()
+
+embedding_matrix = np.zeros((len(word_index) + 1, EMBEDDING_DIM))
+for word, i in word_index.items():
+    embedding_vector = embeddings_index.get(word)
+    if embedding_vector is not None:
+        # words not found in embedding index will be all-zeros.
+        embedding_matrix[i] = embedding_vector
+
+
+embedding_layer = Embedding(len(word_index) + 1,
+                            EMBEDDING_DIM,
+                            weights=[embedding_matrix],
+                            input_length=maxlen,
+                            trainable=False, name="embedding")
+
+model = create_googlenet_text(embedding_layer,'', heatmap=False)
+
+
 
 sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
 model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
 
-checkpointer = ModelCheckpoint(filepath="googlenet_aesthetics_weights.h5", verbose=1, save_best_only=True)
+time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+checkpointer = ModelCheckpoint(filepath="{} googlenet_aesthetics_weights_text.h5".format(time_now), verbose=1, save_best_only=True)
 
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=1, min_lr=1e-6)
 
-csv_logger = CSVLogger('training_gap_aesthetics' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '.log')
+csv_logger = CSVLogger('{} training_gap_aesthetics_text.log'.format(time_now))
 
 
 # class_weight = {0 : 0.67, 1: 0.33}
-model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr])#,class_weight = class_weight)
+model.fit([X_train,X_train_text],Y_train,nb_epoch=20, batch_size=32, shuffle="batch", validation_data=([X_test,X_test_text], Y_test), callbacks=[csv_logger,checkpointer,reduce_lr])#,class_weight = class_weight)
+
+
+# from keras.utils.visualize_util import plot
+# plot(model, to_file='model.png')
+
+
+# model = create_googlenet('googlenet_aesthetics_weights.h5', heatmap=True)
+
+# ava_path = "../dataset/AVA/data/"
+# style = pd.read_table('../dataset/AVA/style_image_lists/train.jpgl', index_col=0)
+# tag = pd.read_table('../dataset/AVA/style_image_lists/train.lab')
+
+# style.loc[:,'style'] = tag.as_matrix()
+
+# ava_with_style = style.join(ava_table, how='inner')
+
+# vanishing_point = ava_with_style.ix[(ava_with_style.ix[:,'style'] == 14)]
+
+# vanishing_point = vanishing_point.sort_values(by="score")
 
 
 
-
-
-model = create_googlenet('googlenet_aesthetics_weights.h5', heatmap=True)
-
-ava_path = "../dataset/AVA/data/"
-style = pd.read_table('../dataset/AVA/style_image_lists/train.jpgl', index_col=0)
-tag = pd.read_table('../dataset/AVA/style_image_lists/train.lab')
-
-style.loc[:,'style'] = tag.as_matrix()
-
-ava_with_style = style.join(ava_table, how='inner')
-
-vanishing_point = ava_with_style.ix[(ava_with_style.ix[:,'style'] == 14)]
-
-vanishing_point = vanishing_point.sort_values(by="score")
-
-for index in vanishing_point.iloc[::-1][:25].index:
-    image_name = str(index) + ".jpg"
-    input_path = ava_path + image_name
-    output_path = "output-semantic/6/" + image_name
-    read_and_generate_heatmap(input_path, output_path)
-
-# weights = np.array([1,2,3,4,5,6,7,8,9,10])
-# score = (ava_table.ix[:,:10] * weights).sum(axis=1) / sum_of_ratings
+# for index in vanishing_point.iloc[::-1][:25].index:
+#     image_name = str(index) + ".jpg"
+#     input_path = ava_path + image_name
+#     output_path = "output-semantic/6/" + image_name
+#     read_and_generate_heatmap(input_path, output_path)

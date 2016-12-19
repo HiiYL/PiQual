@@ -15,13 +15,16 @@ from keras.utils.np_utils import to_categorical
 
 from keras.optimizers import SGD
 
-from keras.callbacks import CSVLogger, ReduceLROnPlateau
+from keras.callbacks import CSVLogger, ReduceLROnPlateau,ModelCheckpoint
 from keras.layers.pooling import GlobalAveragePooling1D,GlobalMaxPooling1D, MaxPooling1D
 
 from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, AveragePooling2D, ZeroPadding2D, Dropout, Flatten, merge, Reshape, Activation
 
 
 from keras.regularizers import l2, activity_l2
+
+
+from datetime import datetime
 
 max_features = 20000
 maxlen=100
@@ -30,7 +33,7 @@ batch_size = 64
 hidden_dims = 250
 nb_epoch = 100
 
-EMBEDDING_DIM = 100
+EMBEDDING_DIM = 300
 delta = 1.0
 
 # Convolution
@@ -56,7 +59,7 @@ def tokenizeAndGenerateIndex(train, test):
 
 def generateIndexMappingToEmbedding():
   embeddings_index = {}
-  f = open(os.path.join(GLOVE_DIR, 'glove.6B.100d.txt'))
+  f = open(os.path.join(GLOVE_DIR, 'glove.6B.{}d.txt'.format(EMBEDDING_DIM)))
   for line in f:
       values = line.split()
       word = values[0]
@@ -105,7 +108,7 @@ embedding_layer = Embedding(len(word_index) + 1,
                             EMBEDDING_DIM,
                             weights=[embedding_matrix],
                             input_length=maxlen,
-                            trainable=False)
+                            trainable=False, name="embedding")
 
 comment_input = Input(shape=(100,), dtype='int32')
 embedded_sequences = embedding_layer(comment_input)
@@ -119,13 +122,13 @@ embedded_sequences = embedding_layer(comment_input)
 # x = MaxPooling1D(5)(x)
 # x = Convolution1D(128, 5, activation='relu')(x)
 # x = MaxPooling1D(35)(x)  # global max pooling
-x = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3)(embedded_sequences)
+x = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3, name="gru")(embedded_sequences)
 # x = Flatten()(x)
 # x = Dense(128, activation='relu')(x)
 # x = Dropout(0.5)(x)
 
 # x = Flatten()(embedded_sequences)
-preds = Dense(2, activation='softmax')(x)
+preds = Dense(2, name="comment_output",activation='softmax')(x)
 
 # question_input = Input(shape=(maxlen,), dtype='int32')
 # x = Embedding(input_dim=max_features,
@@ -141,7 +144,19 @@ preds = Dense(2, activation='softmax')(x)
 # output = Dense(2, activation='softmax')(x)
 
 model = Model(input=comment_input, output=preds)
+
+# model.load_weights('text_binary_weights2016-12-07 09:31:43.h5')
+
+# model.save_weights('text_binary_weights_named.h5')
 # sgd = SGD(lr=0.01, decay=5e-4, momentum=0.9, nesterov=True, clipnorm=1., clipvalue=0.5)
+
+
+time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+checkpointer = ModelCheckpoint(filepath="text_binary_weights{}.h5".format(time_now), verbose=1, save_best_only=True)
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=2)
+csv_logger = CSVLogger('training_binary_text{}.log'.format(time_now))
+
+
 model.compile(loss='categorical_crossentropy',
               optimizer='rmsprop',
               metrics=['accuracy'])
@@ -150,4 +165,4 @@ model.compile(loss='categorical_crossentropy',
 model.fit(X_train, Y_train,
           batch_size=128,
           nb_epoch=20,
-          validation_data=(X_test, Y_test))
+          validation_data=(X_test, Y_test), callbacks=[checkpointer, reduce_lr, csv_logger])
