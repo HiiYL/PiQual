@@ -376,12 +376,15 @@ def create_googlenet(weights_path=None, heatmap=False):
         googlenet = Model(input=input, output=main_output)
     
     if weights_path:
-        googlenet.load_weights('named_googlenet_semantics_weights.h5', by_name=True) ## Load semantic weights
+        if 'rapid' not in weights_path:
+            googlenet.load_weights('weights/named_googlenet_semantics_weights.h5', by_name=True) ## Load semantic weights
+            for i, layer in enumerate(googlenet.layers):
+                if 'semantic' in layer.name:
+                    # print("{} - {}".format(i, layer.name))
+                    layer.trainable = False
         googlenet.load_weights(weights_path,by_name=True)
-        for i, layer in enumerate(googlenet.layers):
-            if 'semantic' in layer.name:
-                # print("{} - {}".format(i, layer.name))
-                layer.trainable = False
+
+
 
     return googlenet
 
@@ -485,7 +488,28 @@ model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch", validatio
 
 
 
-model = create_googlenet('googlenet_aesthetics_weights.h5', heatmap=True)
+model = create_googlenet('weights/2016-12-07 16:54:38 googlenet_aesthetics_weights_rapid_distribution.h5')
+h5f_selfie = h5py.File('../dataset_h5/selfie_images_224x224.h5','r')
+
+out = model.predict(h5f_selfie['data'])
+
+weights = np.array([1,2,3,4,5,6,7,8,9,10])
+score = (out * weights).sum(axis=1)
+
+np.savetxt("out.csv", out, delimiter=",")
+
+# filenames = os.listdir('../../../Downloads/Selfie-dataset/images')
+
+# zipped = zip(filenames, out)
+
+
+# import csv
+
+# with open('selfie_aesthetics', "wb") as csvfile:
+#     writer = csv.writer(csvfile)
+#     for filename, aesthetics in zip(filenames, out):
+#         writer.writerow([filename, aesthetics])
+
 
 ava_path = "../dataset/AVA/data/"
 style = pd.read_table('../dataset/AVA/style_image_lists/train.jpgl', index_col=0)

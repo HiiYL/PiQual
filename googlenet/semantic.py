@@ -199,11 +199,54 @@ def create_googlenet(weights_path=None, heatmap=False):
     inception_4e_output = merge([inception_4e_1x1,inception_4e_3x3,inception_4e_5x5,inception_4e_pool_proj],mode='concat',concat_axis=1,name='inception_4e/output')
     
 
-    conv_output = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1',border_mode = 'same')(inception_4e_output)
+    inception_4e_output_zero_pad = ZeroPadding2D(padding=(1, 1))(inception_4e_output)
+    
+    pool4_helper = PoolHelper()(inception_4e_output_zero_pad)
+    
+    pool4_3x3_s2 = MaxPooling2D(pool_size=(3,3),strides=(2,2),border_mode='valid',name='pool4/3x3_s2')(pool4_helper)
+    
+    
+    inception_5a_1x1 = Convolution2D(256,1,1,border_mode='same',activation='relu',name='inception_5a/1x1',W_regularizer=l2(0.0002))(pool4_3x3_s2)
+    
+    inception_5a_3x3_reduce = Convolution2D(160,1,1,border_mode='same',activation='relu',name='inception_5a/3x3_reduce',W_regularizer=l2(0.0002))(pool4_3x3_s2)
+    
+    inception_5a_3x3 = Convolution2D(320,3,3,border_mode='same',activation='relu',name='inception_5a/3x3',W_regularizer=l2(0.0002))(inception_5a_3x3_reduce)
+    
+    inception_5a_5x5_reduce = Convolution2D(32,1,1,border_mode='same',activation='relu',name='inception_5a/5x5_reduce',W_regularizer=l2(0.0002))(pool4_3x3_s2)
+    
+    inception_5a_5x5 = Convolution2D(128,5,5,border_mode='same',activation='relu',name='inception_5a/5x5',W_regularizer=l2(0.0002))(inception_5a_5x5_reduce)
+    
+    inception_5a_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='inception_5a/pool')(pool4_3x3_s2)
+    
+    inception_5a_pool_proj = Convolution2D(128,1,1,border_mode='same',activation='relu',name='inception_5a/pool_proj',W_regularizer=l2(0.0002))(inception_5a_pool)
+    
+    inception_5a_output = merge([inception_5a_1x1,inception_5a_3x3,inception_5a_5x5,inception_5a_pool_proj],mode='concat',concat_axis=1,name='inception_5a/output')
+    
+    
+    inception_5b_1x1 = Convolution2D(384,1,1,border_mode='same',activation='relu',name='inception_5b/1x1',W_regularizer=l2(0.0002))(inception_5a_output)
+    
+    inception_5b_3x3_reduce = Convolution2D(192,1,1,border_mode='same',activation='relu',name='inception_5b/3x3_reduce',W_regularizer=l2(0.0002))(inception_5a_output)
+    
+    inception_5b_3x3 = Convolution2D(384,3,3,border_mode='same',activation='relu',name='inception_5b/3x3',W_regularizer=l2(0.0002))(inception_5b_3x3_reduce)
+    
+    inception_5b_5x5_reduce = Convolution2D(48,1,1,border_mode='same',activation='relu',name='inception_5b/5x5_reduce',W_regularizer=l2(0.0002))(inception_5a_output)
+    
+    inception_5b_5x5 = Convolution2D(128,5,5,border_mode='same',activation='relu',name='inception_5b/5x5',W_regularizer=l2(0.0002))(inception_5b_5x5_reduce)
+    
+    inception_5b_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='inception_5b/pool')(inception_5a_output)
+    
+    inception_5b_pool_proj = Convolution2D(128,1,1,border_mode='same',activation='relu',name='inception_5b/pool_proj',W_regularizer=l2(0.0002))(inception_5b_pool)
+    
+    inception_5b_output = merge([inception_5b_1x1,inception_5b_3x3,inception_5b_5x5,inception_5b_pool_proj],mode='concat',concat_axis=1,name='inception_5b/output')
+    
+    
+    pool5_7x7_s1 = AveragePooling2D(pool_size=(7,7),strides=(1,1),name='pool5/7x7_s2')(inception_5b_output)
+    
+    loss3_flat = Flatten()(pool5_7x7_s1)
+    
+    pool5_drop_7x7_s1 = Dropout(0.4)(loss3_flat)
 
-    x = GlobalAveragePooling2D()(conv_output)
-
-    main_output = Dense(65, activation = 'softmax', name="main_output")(x)
+    main_output = Dense(65, activation = 'softmax', name="main_output")(pool5_drop_7x7_s1)
     
     if heatmap:
         googlenet = Model(input=input, output=[main_output, conv_output])
@@ -264,7 +307,7 @@ def read_and_generate_heatmap(input_path, output_path):
     cv2.imwrite(output_path, temp)
 
 
-model = create_googlenet('googlenet_weights.h5', heatmap=False)
+model = create_googlenet('weights/googlenet_weights.h5', heatmap=False)
 
 delta = 0.0
 store = HDFStore('../dataset_h5/labels.h5','r')
@@ -290,11 +333,11 @@ Y_test = to_categorical(ava_test.ix[:,10:12].as_matrix())[:,1:]
 sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
 model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
 
-checkpointer = ModelCheckpoint(filepath="googlenet_semantics_weights.h5", verbose=1, save_best_only=True)
+checkpointer = ModelCheckpoint(filepath="googlenet_original_semantics_weights.h5", verbose=1, save_best_only=True)
 
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=1, min_lr=1e-6)
 
-csv_logger = CSVLogger('training_gap_semantics' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '.log')
+csv_logger = CSVLogger('training_semantics' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '.log')
 
 model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch", validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr])
 
