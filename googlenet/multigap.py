@@ -90,6 +90,180 @@ def generateIndexMappingToEmbedding():
   print('Found %s word vectors.' % len(embeddings_index))
   return embeddings_index
 
+def process_image(image):
+    im = np.copy(image)
+    im[:,:,0] -= 103.939
+    im[:,:,1] -= 116.779
+    im[:,:,2] -= 123.68
+    im = im.transpose((2,0,1))
+    im = np.expand_dims(im, axis=0)
+    return im
+
+def deprocess_image(image):
+    im = np.copy(image)
+    im[:,:,0] += 103.939
+    im[:,:,1] += 116.779
+    im[:,:,2] += 123.
+
+    im = im.transpose((1,2,0))
+
+    return im
+
+def read_and_generate_heatmap(input_path, output_path):
+    original_img = cv2.imread(input_path).astype(np.float32)
+
+    width, height, _ = original_img.shape
+
+    im = process_image(cv2.resize(original_img,(224,224)))
+    out = model.predict(im)
+
+    class_weights = model.layers[-1].get_weights()[0]
+    print("predictions", out[0])
+
+    conv_output = out[2][0,:,:,:]
+    #Create the class activation map.
+    cam = np.zeros(dtype = np.float32, shape = conv_output.shape[1:3])
+
+    class_to_visualize = 1 # 0 for bad, 1 for good
+    for i, w in enumerate(class_weights[:, class_to_visualize]):
+            cam += w * conv_output[i, :, :]
+
+    cam /= np.max(cam)
+    cam = cv2.resize(cam, (height, width))
+    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+    heatmap[np.where(cam < 0.2)] = 0
+    temp = heatmap*0.5 + original_img
+    file_name = input_path.split("/")[-1].split(".jpg")[0]
+
+    cv2.imwrite('output/' + input_path.split("/")[-1],original_img)
+    cv2.imwrite('output/{}_aesthetics.jpg'.format(file_name), temp)
+
+
+    top_3_hits = np.argsort(out[1], axis=1)[0][::-1][:3]
+    print("predictions", top_3_hits)
+    semantic_tags = [ semantics.ix[hit + 1].semantic[1:] for hit in top_3_hits] ##NOTE: Quick fix to remove space 
+
+
+    conv_output = out[3][0,:,:,:]
+    #Create the class activation map.
+    nth_top_semantic = 0
+
+    for nth_top_semantic in range(len(top_3_hits)):
+        cam = np.zeros(dtype = np.float32, shape = conv_output.shape[1:3])
+        class_to_visualize = top_3_hits[nth_top_semantic] # 0 for bad, 1 for good
+        for i, w in enumerate(class_weights[:, class_to_visualize]):
+                cam += w * conv_output[i, :, :]
+                
+        cam /= np.max(cam)
+        cam = cv2.resize(cam, (height, width))
+        heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+        heatmap[np.where(cam < 0.2)] = 0
+        temp = heatmap*0.5 + original_img
+        file_name = input_path.split("/")[-1].split(".jpg")[0]
+        cv2.imwrite('output/{}_{}.jpg'.format(file_name, semantic_tags[nth_top_semantic]), temp)
+
+
+def generate_images_heatmap(model, ava_table, style_category=-1):
+    input_images_dir = "images/"
+    output_dir = "output/"
+
+    semantics = pd.read_table('../dataset/AVA/tags.txt',delimiter="(\d+)",
+     usecols=[1,2], index_col=0, header=None,names=['index','semantic'])
+
+    if style_category != -1:
+        style = pd.read_table('../dataset/AVA/style_image_lists/train.jpgl', index_col=0)
+        tag = pd.read_table('../dataset/AVA/style_image_lists/train.lab')
+
+        style.loc[:,'style'] = tag.as_matrix()
+        ava_with_style = style.join(ava_table, how='inner')
+
+        images_with_style = ava_with_style.ix[(ava_with_style.ix[:,'style'] == style_category)]
+        images_with_style = images_with_style.sort_values(by="score")
+
+        ava_path = "../dataset/AVA/data/"
+        for index in images_with_style.iloc[::-1][:25].index:
+            image_name = str(index) + ".jpg"
+            input_path = ava_path + image_name
+            output_path = output_dir + image_name
+            read_and_generate_heatmap(input_path, output_path)
+    else:
+        for file in os.listdir(input_images_dir):
+            if file.endswith('.jpg'):
+                read_and_generate_heatmap(input_images_dir + file, output_dir + file)
+
+
+def getDistribution(dataframe):
+    ratings_matrix = dataframe.ix[:,:10]
+    sum_of_ratings = (dataframe.ix[:,:10]).sum(axis=1)
+    normalized_score_distribution = ratings_matrix.div(sum_of_ratings,axis='index')
+    return normalized_score_distribution.as_matrix()
+
+
+def prepareData(delta=0.0, use_distribution=False, use_semantics=False, use_comments=False):
+    store = HDFStore('../dataset_h5/labels.h5','r')
+    ava_table = store['labels_train']
+    ava_test = store['labels_test']
+
+    if delta > 0.0:
+        ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
+
+
+    h5f = h5py.File('../dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
+    X_train = h5f['data_train']
+    X_test = h5f['data_test']
+
+    if use_comments:
+        comments_train = ava_table.ix[:,'comments'].as_matrix()
+        comments_test = ava_test.ix[:,'comments'].as_matrix()
+
+        X_train_text, X_test_text, word_index = tokenizeAndGenerateIndex(comments_train, comments_test)
+
+        embeddings_index = generateIndexMappingToEmbedding()
+        embedding_matrix = np.zeros((len(word_index) + 1, EMBEDDING_DIM))
+        for word, i in word_index.items():
+            embedding_vector = embeddings_index.get(word)
+            if embedding_vector is not None:
+                # words not found in embedding index will be all-zeros.
+                embedding_matrix[i] = embedding_vector
+
+        embedding_layer = Embedding(len(word_index) + 1,
+                                    EMBEDDING_DIM,
+                                    weights=[embedding_matrix],
+                                    input_length=maxlen,
+                                    trainable=False)
+
+    if use_distribution:
+        Y_train = getDistribution(ava_table)
+        Y_test = getDistribution(ava_test)
+    else:
+        Y_train = ava_table.ix[:, "good"].as_matrix()
+        Y_train = to_categorical(Y_train, 2)
+
+        Y_test = ava_test.ix[:, "good"].as_matrix()
+        Y_test = to_categorical(Y_test, 2)
+
+    if use_semantics:
+        Y_train_semantics = to_categorical(ava_table.ix[:,10:12].as_matrix())[:,1:]
+        Y_test_semantics = to_categorical(ava_test.ix[:,10:12].as_matrix())[:,1:]
+
+        return X_train, Y_train, Y_train_semantics, X_test, Y_test, Y_test_semantics
+
+    return X_train, Y_train, X_test, Y_test
+
+
+def evaluate_distribution_accuracy(model, X_test, Y_test):
+    aesthetics_pred = model.predict(X_test)
+
+    weights = np.array([1,2,3,4,5,6,7,8,9,10])
+    score = (aesthetics_pred * weights).sum(axis=1)
+
+    Y_pred = [ 1 if row >= 5 else 0 for row in score]
+    accuracy = np.sum(Y_pred == Y_test) / len(truth_good)
+
+    print("accuracy = {} %".format(accuracy * 100))
+    return accuracy
+
+
 
 def create_googlenet(weights_path=None, use_distribution=False, use_multigap=False, heatmap=False):
     # creates GoogLeNet a.k.a. Inception v1 (Szegedy, 2015)
@@ -205,152 +379,21 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
     
     return googlenet
 
-def process_image(image):
-    im = np.copy(image)
-    im[:,:,0] -= 103.939
-    im[:,:,1] -= 116.779
-    im[:,:,2] -= 123.68
-    im = im.transpose((2,0,1))
-    im = np.expand_dims(im, axis=0)
-    return im
-
-def deprocess_image(image):
-    im = np.copy(image)
-    im[:,:,0] += 103.939
-    im[:,:,1] += 116.779
-    im[:,:,2] += 123.
-
-    im = im.transpose((1,2,0))
-
-    return im
-
-def read_and_generate_heatmap(input_path, output_path):
-    original_img = cv2.imread(input_path).astype(np.float32)
-
-    width, height, _ = original_img.shape
-
-    im = process_image(cv2.resize(original_img,(224,224)))
-    out = model.predict(im)
-
-    class_weights = model.layers[-1].get_weights()[0]
-    print("predictions", out[0])
-
-    conv_output = out[2][0,:,:,:]
-    #Create the class activation map.
-    cam = np.zeros(dtype = np.float32, shape = conv_output.shape[1:3])
-
-    class_to_visualize = 1 # 0 for bad, 1 for good
-    for i, w in enumerate(class_weights[:, class_to_visualize]):
-            cam += w * conv_output[i, :, :]
-
-    cam /= np.max(cam)
-    cam = cv2.resize(cam, (height, width))
-    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-    heatmap[np.where(cam < 0.2)] = 0
-    temp = heatmap*0.5 + original_img
-    file_name = input_path.split("/")[-1].split(".jpg")[0]
-
-    cv2.imwrite('output/' + input_path.split("/")[-1],original_img)
-    cv2.imwrite('output/{}_aesthetics.jpg'.format(file_name), temp)
-
-
-    top_3_hits = np.argsort(out[1], axis=1)[0][::-1][:3]
-    print("predictions", top_3_hits)
-    semantic_tags = [ semantics.ix[hit + 1].semantic[1:] for hit in top_3_hits] ##NOTE: Quick fix to remove space 
-
-
-    conv_output = out[3][0,:,:,:]
-    #Create the class activation map.
-    nth_top_semantic = 0
-
-    for nth_top_semantic in range(len(top_3_hits)):
-        cam = np.zeros(dtype = np.float32, shape = conv_output.shape[1:3])
-        class_to_visualize = top_3_hits[nth_top_semantic] # 0 for bad, 1 for good
-        for i, w in enumerate(class_weights[:, class_to_visualize]):
-                cam += w * conv_output[i, :, :]
-                
-        cam /= np.max(cam)
-        cam = cv2.resize(cam, (height, width))
-        heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-        heatmap[np.where(cam < 0.2)] = 0
-        temp = heatmap*0.5 + original_img
-        file_name = input_path.split("/")[-1].split(".jpg")[0]
-        cv2.imwrite('output/{}_{}.jpg'.format(file_name, semantic_tags[nth_top_semantic]), temp)
-
-
-def getDistribution(dataframe):
-    ratings_matrix = dataframe.ix[:,:10]
-    sum_of_ratings = (dataframe.ix[:,:10]).sum(axis=1)
-    normalized_score_distribution = ratings_matrix.div(sum_of_ratings,axis='index')
-    return normalized_score_distribution.as_matrix()
-
-delta = 0.0
-store = HDFStore('../dataset_h5/labels.h5','r')
-# delta = 1
-ava_table = store['labels_train']
-
-ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
-h5f = h5py.File('../dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
-X_train = h5f['data_train']
-#X_train = np.hstack(X).reshape(3,224,224,16160).T
-
-#X_train = X_train.astype('float32')
-
-Y_train = ava_table.ix[:, "good"].as_matrix()
-Y_train = to_categorical(Y_train, 2)
-# Y_train = getDistribution(ava_table)
-
-# Y_train_semantics = to_categorical(ava_table.ix[:,10:12].as_matrix())[:,1:]
-
-X_test = h5f['data_test']
-ava_test = store['labels_test']
-
-Y_test = ava_test.ix[:, "good"].as_matrix()
-Y_test = to_categorical(Y_test, 2)
-# Y_test = getDistribution(ava_test)
-
-# Y_test_semantics = to_categorical(ava_test.ix[:,10:12].as_matrix())[:,1:]
 
 
 
-# comments_train = ava_table.ix[:,'comments'].as_matrix()
-# comments_test = ava_test.ix[:,'comments'].as_matrix()
+X_train, Y_train, X_test, Y_test = prepareData(use_distribution=True,use_multigap=False)
 
-
-# X_train_text, X_test_text, word_index = tokenizeAndGenerateIndex(comments_train, comments_test)
-# embeddings_index = generateIndexMappingToEmbedding()
-# embedding_matrix = np.zeros((len(word_index) + 1, EMBEDDING_DIM))
-# for word, i in word_index.items():
-#     embedding_vector = embeddings_index.get(word)
-#     if embedding_vector is not None:
-#         # words not found in embedding index will be all-zeros.
-#         embedding_matrix[i] = embedding_vector
-
-
-# embedding_layer = Embedding(len(word_index) + 1,
-#                             EMBEDDING_DIM,
-#                             weights=[embedding_matrix],
-#                             input_length=maxlen,
-#                             trainable=False)
-
-model = create_googlenet('weights/googlenet_aesthetics_weights.h5', use_distribution=False,use_multigap=True,heatmap=False)
-
+model = create_googlenet('weights/googlenet_aesthetics_weights.h5', use_distribution=True,use_multigap=False,heatmap=False)
 sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
-
 # rmsProp = RMSprop(lr=0.00001, rho=0.9, epsilon=1e-08, decay=0.0)
+
 model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
 
-
-model.evaluate(X_test,Y_test)
-
 time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
 checkpointer = ModelCheckpoint(filepath="weights/multigap_distribution_weights_aes_only_sgd{}.h5".format(time_now), verbose=1, save_best_only=True)
-
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=3)
-
 csv_logger = CSVLogger('logs/multigap_distribution_weights_aes_only_sgd{}.log'.format(time_now))
-
 
 # class_weight = {0 : 0.67, 1: 0.33}
 model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch",
@@ -360,57 +403,15 @@ from keras.utils.visualize_util import plot
 plot(model, to_file='model_multigap_binary.png')
 
 
-semantics = pd.read_table('../dataset/AVA/tags.txt',delimiter="(\d+)", usecols=[1,2], index_col=0, header=None,names=['index','semantic'])
-
-
 
 model = create_googlenet(embedding_layer, 'weights/multigap_distribution_weights_aes_only2016-12-26 18:03:42.h5', heatmap=False)
-aesthetics_pred = model.predict(X_test)
-
-
-good_ = aesthetics_pred[:,5:].sum(axis=1)
-bad_ =  aesthetics_pred[:,:5].sum(axis=1)
-
-result = [list(x) for x in zip(bad_, good_)]
-
-good = np.argmax(result,axis=1)
-
-np.sum(good == truth_good) / len(truth_good)
-
-weights = np.array([1,2,3,4,5,6,7,8,9,10])
-score = (aesthetics_pred * weights).sum(axis=1)
-
-good = [ 1 if row >= 5 else 0 for row in score]
-
-truth_good = ava_test.ix[:, "good"].as_matrix()
-
-np.sum(good == truth_good) / len(truth_good)
+accuracy = evaluate_distribution_accuracy(model, X_test, Y_test)
 
 
 
-model = create_googlenet('weights/multigap_distribution_weights2016-12-19 11:20:47.h5', heatmap=True)
-
-ava_path = "../dataset/AVA/data/"
-style = pd.read_table('../dataset/AVA/style_image_lists/train.jpgl', index_col=0)
-tag = pd.read_table('../dataset/AVA/style_image_lists/train.lab')
-
-style.loc[:,'style'] = tag.as_matrix()
-
-ava_with_style = style.join(ava_table, how='inner')
-
-vanishing_point = ava_with_style.ix[(ava_with_style.ix[:,'style'] == 14)]
-
-vanishing_point = vanishing_point.sort_values(by="score")
-
-for index in vanishing_point.iloc[::-1][:25].index:
-    image_name = str(index) + ".jpg"
-    input_path = ava_path + image_name
-    output_path = "output-semantic/6/" + image_name
-    read_and_generate_heatmap(input_path, output_path)
 
 
-input_images_dir = "images/"
-output_dir = "output/"
-for file in os.listdir(input_images_dir):
-    if 'jpg' in file:
-        read_and_generate_heatmap(input_images_dir + file, output_dir + file)
+
+
+
+
