@@ -236,7 +236,7 @@ def evaluate_distribution_accuracy(model, X_test, Y_test):
     Y_test_binary = np.array([ 1 if row >= 5 else 0 for row in score_test])
 
 
-    accuracy = np.sum(Y_pred_binary == Y_test_binary) / len(Y_test)
+    accuracy = np.sum(Y_pred_binary == Y_test_binary) / len(Y_test_binary)
 
     print("accuracy = {} %".format(accuracy * 100))
     return accuracy
@@ -374,7 +374,10 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
         x_aesthetics = merge([x_aesthetics, inception_4a_gap, inception_4b_gap, inception_4c_gap, inception_4d_gap] ,mode='concat',concat_axis=1)
 
     if use_distribution:
-        output_aesthetics = Dense(10, activation = 'softmax', name="main_output_")(x_aesthetics)
+        if use_multigap:
+            output_aesthetics = Dense(10, activation = 'softmax', name="main_output__")(x_aesthetics)
+        else:
+            output_aesthetics = Dense(10, activation = 'softmax', name="main_output_")(x_aesthetics)
     else:
         if use_multigap:
             output_aesthetics = Dense(2, activation = 'softmax', name="main_output_")(x_aesthetics)
@@ -401,13 +404,15 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
 use_distribution = True
 X_train, Y_train, X_test, Y_test = prepareData(use_distribution=use_distribution)
 
-model = create_googlenet('weights/googlenet_aesthetics_weights.h5', use_distribution=use_distribution,use_multigap=False,heatmap=False)
+model = create_googlenet('weights/gap_distribution_weights_aes_only_sgd2016-12-31 14:53:03.h5', use_distribution=use_distribution,use_multigap=True,heatmap=False)
 sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
 # rmsProp = RMSprop(lr=0.00001, rho=0.9, epsilon=1e-08, decay=0.0)
 
 if use_distribution:
+    print("using kld loss...")
     model.compile(optimizer=sgd,loss='kld', metrics=['accuracy'])
 else:
+    print("using categorical crossentropy loss...")
     model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
 
 time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -420,10 +425,10 @@ model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch",
  validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
 
 from keras.utils.visualize_util import plot
-plot(model, to_file='model_gap_distribution.png',show_shapes=True)
+plot(model, to_file='model_multigap_distribution.png',show_shapes=True)
 
-model = create_googlenet('weights/multigap_distribution_weights_aes_only_sgd2016-12-30 09:48:23.h5',
- use_distribution=use_distribution,use_multigap=False,heatmap=False)
+model = create_googlenet('weights/gap_distribution_weights_aes_only_sgd2016-12-31 14:53:03.h5',
+ use_distribution=use_distribution,use_multigap=True,heatmap=False)
 
 model.evaluate(X_test,Y_test)
 accuracy = evaluate_distribution_accuracy(model, X_test, Y_test)
