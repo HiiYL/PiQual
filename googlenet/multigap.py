@@ -228,10 +228,15 @@ def evaluate_distribution_accuracy(model, X_test, Y_test):
     aesthetics_pred = model.predict(X_test)
 
     weights = np.array([1,2,3,4,5,6,7,8,9,10])
-    score = (aesthetics_pred * weights).sum(axis=1)
 
-    Y_pred = [ 1 if row >= 5 else 0 for row in score]
-    accuracy = np.sum(Y_pred == Y_test) / len(truth_good)
+    score_pred = (aesthetics_pred * weights).sum(axis=1)
+    score_test = (Y_test * weights).sum(axis=1)
+
+    Y_pred_binary = np.array([ 1 if row >= 5 else 0 for row in score_pred])
+    Y_test_binary = np.array([ 1 if row >= 5 else 0 for row in score_test])
+
+
+    accuracy = np.sum(Y_pred_binary == Y_test_binary) / len(Y_test)
 
     print("accuracy = {} %".format(accuracy * 100))
     return accuracy
@@ -393,29 +398,34 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
     return googlenet
 
 
+use_distribution = True
+X_train, Y_train, X_test, Y_test = prepareData(use_distribution=use_distribution)
 
-
-X_train, Y_train, X_test, Y_test = prepareData(use_distribution=True,use_multigap=False)
-
-model = create_googlenet('weights/googlenet_aesthetics_weights.h5', use_distribution=True,use_multigap=False,heatmap=False)
+model = create_googlenet('weights/googlenet_aesthetics_weights.h5', use_distribution=use_distribution,use_multigap=False,heatmap=False)
 sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
 # rmsProp = RMSprop(lr=0.00001, rho=0.9, epsilon=1e-08, decay=0.0)
 
-model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
+if use_distribution:
+    model.compile(optimizer=sgd,loss='kld', metrics=['accuracy'])
+else:
+    model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
 
 time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-checkpointer = ModelCheckpoint(filepath="weights/multigap_distribution_weights_aes_only_sgd{}.h5".format(time_now), verbose=1, save_best_only=True)
+checkpointer = ModelCheckpoint(filepath="weights/gap_distribution_weights_aes_only_sgd{}.h5".format(time_now), verbose=1, save_best_only=True)
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=3)
-csv_logger = CSVLogger('logs/multigap_distribution_weights_aes_only_sgd{}.log'.format(time_now))
+csv_logger = CSVLogger('logs/gap_distribution_weights_aes_only_sgd{}.log'.format(time_now))
 
 # class_weight = {0 : 0.67, 1: 0.33}
 model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch",
  validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
 
 from keras.utils.visualize_util import plot
-plot(model, to_file='model_multigap_binary.png')
+plot(model, to_file='model_gap_distribution.png',show_shapes=True)
 
-model = create_googlenet(embedding_layer, 'weights/multigap_distribution_weights_aes_only2016-12-26 18:03:42.h5', heatmap=False)
+model = create_googlenet('weights/multigap_distribution_weights_aes_only_sgd2016-12-30 09:48:23.h5',
+ use_distribution=use_distribution,use_multigap=False,heatmap=False)
+
+model.evaluate(X_test,Y_test)
 accuracy = evaluate_distribution_accuracy(model, X_test, Y_test)
 
 
