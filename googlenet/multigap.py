@@ -1,21 +1,5 @@
 from googlenet_custom_layers import PoolHelper,LRN
 from keras.models import model_from_json
-
-from keras.applications.inception_v3 import InceptionV3
-from keras.callbacks import ModelCheckpoint
-from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D,Convolution1D
-
-from keras.layers import Dense, Activation
-from keras.models import Model
-
-from keras.utils.np_utils import to_categorical
-from keras.callbacks import CSVLogger, ReduceLROnPlateau
-
-from keras.layers.pooling import GlobalAveragePooling2D, GlobalMaxPooling2D,GlobalMaxPooling1D
-
-from keras.optimizers import SGD
-from keras.models import load_model
-
 import cv2
 
 from scipy import ndimage, misc
@@ -48,18 +32,7 @@ from keras.preprocessing.sequence import pad_sequences
 
 max_features = 20000
 maxlen=100
-batch_size = 64
-
-hidden_dims = 250
-nb_epoch = 100
-
 EMBEDDING_DIM = 300
-delta = 1.0
-
-# Convolution
-filter_length = 5
-nb_filter = 64
-pool_length = 4
 
 
 GLOVE_DIR = "../comments/glove/"
@@ -265,11 +238,18 @@ def evaluate_distribution_accuracy(model, X_test, Y_test):
 
 
 
-def create_googlenet(weights_path=None, use_distribution=False, use_multigap=False, heatmap=False):
-    # creates GoogLeNet a.k.a. Inception v1 (Szegedy, 2015)
-    input = Input(shape=(3, 224, 224))
+def create_googlenet(weights_path=None, use_distribution=False, use_multigap=False,use_semantics=False, use_comments=False, embedding_layer=None,heatmap=False):
+
+    input_image = Input(shape=(3, 224, 224))
+
+    if embedding_layer and use_comments:
+        comment_input = Input(shape=(maxlen,), dtype='int32')
+        embedded_sequences = embedding_layer(comment_input)
+        
+        x_text_aesthetics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3)(embedded_sequences)
+        x_text_semantics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3)(embedded_sequences)
     
-    conv1_7x7_s2 = Convolution2D(64,7,7,subsample=(2,2),border_mode='same',activation='relu',name='conv1/7x7_s2',W_regularizer=l2(0.0002))(input)
+    conv1_7x7_s2 = Convolution2D(64,7,7,subsample=(2,2),border_mode='same',activation='relu',name='conv1/7x7_s2',W_regularizer=l2(0.0002))(input_image)
     conv1_zero_pad = ZeroPadding2D(padding=(1, 1))(conv1_7x7_s2)
     pool1_helper = PoolHelper()(conv1_zero_pad)
     pool1_3x3_s2 = MaxPooling2D(pool_size=(3,3),strides=(2,2),border_mode='valid',name='pool1/3x3_s2')(pool1_helper)
@@ -348,17 +328,41 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
     inception_4d_output = merge([inception_4d_1x1,inception_4d_3x3,inception_4d_5x5,inception_4d_pool_proj],mode='concat',concat_axis=1,name='inception_4d/output')
     inception_4d_gap = GlobalAveragePooling2D()(inception_4d_output)
 
-    inception_4e_1x1 = Convolution2D(256,1,1,border_mode='same',activation='relu',name='inception_4e/1x1',W_regularizer=l2(0.0002))(inception_4d_output)
-    inception_4e_3x3_reduce = Convolution2D(160,1,1,border_mode='same',activation='relu',name='inception_4e/3x3_reduce',W_regularizer=l2(0.0002))(inception_4d_output)
-    inception_4e_3x3 = Convolution2D(320,3,3,border_mode='same',activation='relu',name='inception_4e/3x3',W_regularizer=l2(0.0002))(inception_4e_3x3_reduce)
-    inception_4e_5x5_reduce = Convolution2D(32,1,1,border_mode='same',activation='relu',name='inception_4e/5x5_reduce',W_regularizer=l2(0.0002))(inception_4d_output)
-    inception_4e_5x5 = Convolution2D(128,5,5,border_mode='same',activation='relu',name='inception_4e/5x5',W_regularizer=l2(0.0002))(inception_4e_5x5_reduce)
-    inception_4e_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='inception_4e/pool')(inception_4d_output)
-    inception_4e_pool_proj = Convolution2D(128,1,1,border_mode='same',activation='relu',name='inception_4e/pool_proj',W_regularizer=l2(0.0002))(inception_4e_pool)
-    inception_4e_output = merge([inception_4e_1x1,inception_4e_3x3,inception_4e_5x5,inception_4e_pool_proj],mode='concat',concat_axis=1,name='inception_4e/output')
-    
-    conv_output_aesthetics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output)
+    if use_semantics:
+        inception_4e_1x1_aesthetics = Convolution2D(256,1,1,border_mode='same',activation='relu',name='inception_4e/1x1_aesthetics',W_regularizer=l2(0.0002))(inception_4d_output)
+        inception_4e_3x3_reduce_aesthetics = Convolution2D(160,1,1,border_mode='same',activation='relu',name='inception_4e/3x3_reduce_aesthetics',W_regularizer=l2(0.0002))(inception_4d_output)
+        inception_4e_3x3_aesthetics= Convolution2D(320,3,3,border_mode='same',activation='relu',name='inception_4e/3x3_aesthetics',W_regularizer=l2(0.0002))(inception_4e_3x3_reduce_aesthetics)
+        inception_4e_5x5_reduce_aesthetics = Convolution2D(32,1,1,border_mode='same',activation='relu',name='inception_4e/5x5_reduce_aesthetics',W_regularizer=l2(0.0002))(inception_4d_output)
+        inception_4e_5x5_aesthetics = Convolution2D(128,5,5,border_mode='same',activation='relu',name='inception_4e/5x5_aesthetics',W_regularizer=l2(0.0002))(inception_4e_5x5_reduce_aesthetics)
+        inception_4e_pool_aesthetics = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='inception_4e/pool_aesthetics')(inception_4d_output)
+        inception_4e_pool_proj_aesthetics = Convolution2D(128,1,1,border_mode='same',activation='relu',name='inception_4e/pool_proj_aesthetics',W_regularizer=l2(0.0002))(inception_4e_pool_aesthetics)
+        inception_4e_output_aesthetics = merge([inception_4e_1x1_aesthetics,inception_4e_3x3_aesthetics,inception_4e_5x5_aesthetics,inception_4e_pool_proj_aesthetics],mode='concat',concat_axis=1,name='inception_4e/output_aesthetics')
+        conv_output_aesthetics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output_aesthetics)
+        
+        inception_4e_1x1_semantics = Convolution2D(256,1,1,border_mode='same',activation='relu',name='inception_4e/1x1_semantics',W_regularizer=l2(0.0002))(inception_4d_output)
+        inception_4e_3x3_reduce_semantics = Convolution2D(160,1,1,border_mode='same',activation='relu',name='inception_4e/3x3_reduce_semantics',W_regularizer=l2(0.0002))(inception_4d_output)
+        inception_4e_3x3_semantics = Convolution2D(320,3,3,border_mode='same',activation='relu',name='inception_4e/3x3_semantics',W_regularizer=l2(0.0002))(inception_4e_3x3_reduce_semantics)
+        inception_4e_5x5_reduce_semantics = Convolution2D(32,1,1,border_mode='same',activation='relu',name='inception_4e/5x5_reduce_semantics',W_regularizer=l2(0.0002))(inception_4d_output)
+        inception_4e_5x5_semantics = Convolution2D(128,5,5,border_mode='same',activation='relu',name='inception_4e/5x5_semantics',W_regularizer=l2(0.0002))(inception_4e_5x5_reduce_semantics)
+        inception_4e_pool_semantics = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='inception_4e/pool_semantics')(inception_4d_output)
+        inception_4e_pool_proj_semantics = Convolution2D(128,1,1,border_mode='same',activation='relu',name='inception_4e/pool_proj_semantics',W_regularizer=l2(0.0002))(inception_4e_pool_semantics)
+        inception_4e_output_semantics = merge([inception_4e_1x1_semantics,inception_4e_3x3_semantics,inception_4e_5x5_semantics,inception_4e_pool_proj_semantics],mode='concat',concat_axis=1,name='inception_4e/output_semantics')
+        conv_output_semantics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_semantics',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output_semantics)
+        
+        x_semantics = GlobalAveragePooling2D()(conv_output_semantics)
+        output_semantics = Dense(65, activation = 'softmax', name="output_semantics")(x_semantics)
 
+    else:
+        inception_4e_1x1 = Convolution2D(256,1,1,border_mode='same',activation='relu',name='inception_4e/1x1',W_regularizer=l2(0.0002))(inception_4d_output)
+        inception_4e_3x3_reduce = Convolution2D(160,1,1,border_mode='same',activation='relu',name='inception_4e/3x3_reduce',W_regularizer=l2(0.0002))(inception_4d_output)
+        inception_4e_3x3 = Convolution2D(320,3,3,border_mode='same',activation='relu',name='inception_4e/3x3',W_regularizer=l2(0.0002))(inception_4e_3x3_reduce)
+        inception_4e_5x5_reduce = Convolution2D(32,1,1,border_mode='same',activation='relu',name='inception_4e/5x5_reduce',W_regularizer=l2(0.0002))(inception_4d_output)
+        inception_4e_5x5 = Convolution2D(128,5,5,border_mode='same',activation='relu',name='inception_4e/5x5',W_regularizer=l2(0.0002))(inception_4e_5x5_reduce)
+        inception_4e_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='inception_4e/pool')(inception_4d_output)
+        inception_4e_pool_proj = Convolution2D(128,1,1,border_mode='same',activation='relu',name='inception_4e/pool_proj',W_regularizer=l2(0.0002))(inception_4e_pool)
+        inception_4e_output = merge([inception_4e_1x1,inception_4e_3x3,inception_4e_5x5,inception_4e_pool_proj],mode='concat',concat_axis=1,name='inception_4e/output')  
+        conv_output_aesthetics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output)
+    
     x_aesthetics = GlobalAveragePooling2D()(conv_output_aesthetics)
 
     if use_multigap:
@@ -372,7 +376,16 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
         else:
             output_aesthetics = Dense(2, activation = 'softmax', name="main_output")(x_aesthetics)
     
-    googlenet = Model(input=input, output=output_aesthetics)
+    if use_semantics:
+        if embedding_layer and use_comments:
+            googlenet = Model(input=[input_image, comment_input], output=[output_aesthetics,output_semantics])
+        else:
+            googlenet = Model(input=input_image, output=[output_aesthetics,output_semantics])
+    else:
+        if embedding_layer and use_comments:
+            googlenet = Model(input=[input_image, comment_input], output=output_aesthetics)
+        else:
+            googlenet = Model(input=input_image, output=output_aesthetics)
     
     if weights_path:
         googlenet.load_weights(weights_path,by_name=True)
@@ -401,8 +414,6 @@ model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch",
 
 from keras.utils.visualize_util import plot
 plot(model, to_file='model_multigap_binary.png')
-
-
 
 model = create_googlenet(embedding_layer, 'weights/multigap_distribution_weights_aes_only2016-12-26 18:03:42.h5', heatmap=False)
 accuracy = evaluate_distribution_accuracy(model, X_test, Y_test)

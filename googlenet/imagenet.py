@@ -243,7 +243,7 @@ def create_googlenet(weights_path=None):
     loss3_classifier_act = Activation('softmax',name='prob')(loss3_classifier)
     
     
-    googlenet = Model(input=input, output=[loss1_classifier_act,loss2_classifier_act,loss3_classifier_act])
+    googlenet = Model(input=input, output=[loss3_flat])
     
     if weights_path:
         googlenet.load_weights(weights_path)
@@ -253,4 +253,4 @@ def create_googlenet(weights_path=None):
 
 
 
-model = create_googlenet('weights/googlenet_weights.h5')
+# model = create_googlenet('weights/googlenet_weights.h5')
