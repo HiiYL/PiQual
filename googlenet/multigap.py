@@ -20,15 +20,22 @@ from scipy.misc import imread, imresize
 
 from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, AveragePooling2D, ZeroPadding2D, Dropout, Flatten, merge, Reshape, Activation
 from keras.layers import Input, Embedding, LSTM, Dense, Activation, GRU,Convolution1D,Dropout
+from keras.layers.pooling import GlobalAveragePooling2D, GlobalMaxPooling2D,GlobalMaxPooling1D
 from keras.models import Model
 from keras.regularizers import l2
 from keras.optimizers import SGD, RMSprop
+from keras.utils.np_utils import to_categorical
+from keras.callbacks import CSVLogger, ReduceLROnPlateau, ModelCheckpoint
+
+from keras.preprocessing.text import Tokenizer
+from keras.preprocessing.sequence import pad_sequences
+
+
 from googlenet_custom_layers import PoolHelper,LRN
 
 from datetime import datetime
 
-from keras.preprocessing.text import Tokenizer
-from keras.preprocessing.sequence import pad_sequences
+
 
 max_features = 20000
 maxlen=100
@@ -225,7 +232,13 @@ def prepareData(delta=0.0, use_distribution=False, use_semantics=False, use_comm
 
 
 def evaluate_distribution_accuracy(model, X_test, Y_test):
-    aesthetics_pred = model.predict(X_test)
+    y_pred = model.predict(X_test)
+
+    if(len(y_pred) > 1):
+        aesthetics_pred = y_pred[0]
+    else:
+        aesthetics_pred = y_pred
+
 
     weights = np.array([1,2,3,4,5,6,7,8,9,10])
 
@@ -402,30 +415,34 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
 
 
 use_distribution = True
-X_train, Y_train, X_test, Y_test = prepareData(use_distribution=use_distribution)
+# X_train, Y_train, X_test, Y_test = prepareData(use_distribution=use_distribution)
+X_train, Y_train, Y_train_semantics, X_test, Y_test, Y_test_semantics = prepareData(use_distribution=use_distribution, use_semantics=True)
 
-model = create_googlenet('weights/gap_distribution_weights_aes_only_sgd2016-12-31 14:53:03.h5', use_distribution=use_distribution,use_multigap=True,heatmap=False)
+model = create_googlenet('weights/gap_distribution_weights_aes_only_sgd2016-12-31 14:53:03.h5', use_distribution=use_distribution, use_semantics=True,use_multigap=True,heatmap=False)
 sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
-# rmsProp = RMSprop(lr=0.00001, rho=0.9, epsilon=1e-08, decay=0.0)
+rmsProp = RMSprop(lr=0.00001, rho=0.9, epsilon=1e-08, decay=0.0)
 
 if use_distribution:
     print("using kld loss...")
-    model.compile(optimizer=sgd,loss='kld', metrics=['accuracy'])
+    model.compile(optimizer=rmsProp,loss='kld', metrics=['accuracy'])
 else:
     print("using categorical crossentropy loss...")
-    model.compile(optimizer=sgd,loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=rmsProp,loss='categorical_crossentropy', metrics=['accuracy'])
 
 time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-checkpointer = ModelCheckpoint(filepath="weights/gap_distribution_weights_aes_only_sgd{}.h5".format(time_now), verbose=1, save_best_only=True)
+checkpointer = ModelCheckpoint(filepath="weights/joint_multigap_distribution_weights_aes_only_sgd{}.h5".format(time_now), verbose=1, save_best_only=False)
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=3)
-csv_logger = CSVLogger('logs/gap_distribution_weights_aes_only_sgd{}.log'.format(time_now))
+csv_logger = CSVLogger('logs/joint_multigap_distribution_weights_aes_only_sgd{}.log'.format(time_now))
 
 # class_weight = {0 : 0.67, 1: 0.33}
-model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch",
- validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
+# model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch",
+#  validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
+
+model.fit(X_train,[Y_train, Y_train_semantics],nb_epoch=20, batch_size=32, shuffle="batch",
+ validation_data=(X_test, [Y_test,Y_test_semantics]), callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
 
 from keras.utils.visualize_util import plot
-plot(model, to_file='model_multigap_distribution.png',show_shapes=True)
+plot(model, to_file='model_multigap_joint_distribution.png',show_shapes=True)
 
 model = create_googlenet('weights/gap_distribution_weights_aes_only_sgd2016-12-31 14:53:03.h5',
  use_distribution=use_distribution,use_multigap=True,heatmap=False)
