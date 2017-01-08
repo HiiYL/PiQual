@@ -226,15 +226,22 @@ def prepareData(delta=0.0, use_distribution=False, use_semantics=False, use_comm
         Y_train_semantics = to_categorical(ava_table.ix[:,10:12].as_matrix())[:,1:]
         Y_test_semantics = to_categorical(ava_test.ix[:,10:12].as_matrix())[:,1:]
 
-        return X_train, Y_train, Y_train_semantics, X_test, Y_test, Y_test_semantics
+        if use_comments:
+            return X_train, Y_train, Y_train_semantics, X_test, Y_test, Y_test_semantics, X_train_text, X_test_text, embedding_layer
+        else:
+            return X_train, Y_train, Y_train_semantics, X_test, Y_test, Y_test_semantics
 
-    return X_train, Y_train, X_test, Y_test
+
+    if use_comments:
+        return X_train, Y_train, X_test, Y_test, X_train_text, X_test_text, embedding_layer
+    else:
+        return X_train, Y_train, X_test, Y_test
 
 
 def evaluate_distribution_accuracy(model, X_test, Y_test):
     y_pred = model.predict(X_test)
 
-    if(len(y_pred) > 1):
+    if(y_pred is list):
         aesthetics_pred = y_pred[0]
     else:
         aesthetics_pred = y_pred
@@ -260,12 +267,20 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
 
     input_image = Input(shape=(3, 224, 224))
 
-    if embedding_layer and use_comments:
+    if use_comments:
+        if embedding_layer is None:
+            print("[ERROR] Embedding layer is required for creating comments model")
+            return None
+
         comment_input = Input(shape=(maxlen,), dtype='int32')
         embedded_sequences = embedding_layer(comment_input)
         
-        x_text_aesthetics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3)(embedded_sequences)
-        x_text_semantics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3)(embedded_sequences)
+        x_text_aesthetics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3,return_sequences=True, name='gru_aesthetics_1')(embedded_sequences)
+        x_text_aesthetics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3,name='gru_aesthetics_2')(x_text_aesthetics)
+
+        x_text_semantics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3,return_sequences=True, name='gru_semantics_1')(embedded_sequences)
+        x_text_semantics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3, name='gru_semantics_2')(x_text_semantics)
+
     
     conv1_7x7_s2 = Convolution2D(64,7,7,subsample=(2,2),border_mode='same',activation='relu',name='conv1/7x7_s2',W_regularizer=l2(0.0002))(input_image)
     conv1_zero_pad = ZeroPadding2D(padding=(1, 1))(conv1_7x7_s2)
@@ -368,6 +383,10 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
         conv_output_semantics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_semantics',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output_semantics)
         
         x_semantics = GlobalAveragePooling2D()(conv_output_semantics)
+
+        if use_comments:
+             x_semantics = merge([x_semantics, x_text_semantics],mode='concat',concat_axis=1)
+
         output_semantics = Dense(65, activation = 'softmax', name="output_semantics")(x_semantics)
 
     else:
@@ -384,7 +403,10 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
     x_aesthetics = GlobalAveragePooling2D()(conv_output_aesthetics)
 
     if use_multigap:
-        x_aesthetics = merge([x_aesthetics, inception_4a_gap, inception_4b_gap, inception_4c_gap, inception_4d_gap] ,mode='concat',concat_axis=1)
+        if use_comments:
+            x_aesthetics = merge([x_aesthetics, x_text_aesthetics, inception_4a_gap, inception_4b_gap, inception_4c_gap, inception_4d_gap] ,mode='concat',concat_axis=1)
+        else:
+            x_aesthetics = merge([x_aesthetics, inception_4a_gap, inception_4b_gap, inception_4c_gap, inception_4d_gap] ,mode='concat',concat_axis=1)
 
     if use_distribution:
         if use_multigap:
@@ -398,51 +420,66 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
             output_aesthetics = Dense(2, activation = 'softmax', name="main_output")(x_aesthetics)
     
     if use_semantics:
-        if embedding_layer and use_comments:
+        if use_comments:
             googlenet = Model(input=[input_image, comment_input], output=[output_aesthetics,output_semantics])
         else:
             googlenet = Model(input=input_image, output=[output_aesthetics,output_semantics])
     else:
-        if embedding_layer and use_comments:
+        if use_comments:
             googlenet = Model(input=[input_image, comment_input], output=output_aesthetics)
         else:
             googlenet = Model(input=input_image, output=output_aesthetics)
     
     if weights_path:
+        if use_semantics:
+            googlenet.load_weights('weights/named_googlenet_semantics_weights.h5', by_name=True)
         googlenet.load_weights(weights_path,by_name=True)
+
     
     return googlenet
 
 
 use_distribution = True
 # X_train, Y_train, X_test, Y_test = prepareData(use_distribution=use_distribution)
-X_train, Y_train, Y_train_semantics, X_test, Y_test, Y_test_semantics = prepareData(use_distribution=use_distribution, use_semantics=True)
+X_train, Y_train, Y_train_semantics,
+ X_test, Y_test, Y_test_semantics,
+  X_train_text, X_test_text,
+   embedding_layer = prepareData(use_distribution=use_distribution, use_semantics=True, use_comments=True)
 
-model = create_googlenet('weights/gap_distribution_weights_aes_only_sgd2016-12-31 14:53:03.h5', use_distribution=use_distribution, use_semantics=True,use_multigap=True,heatmap=False)
-sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
+model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
+ use_distribution=use_distribution, use_semantics=True,use_multigap=True,use_comments=True,
+  embedding_layer=embedding_layer, heatmap=False)
+# sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
 rmsProp = RMSprop(lr=0.00001, rho=0.9, epsilon=1e-08, decay=0.0)
 
 if use_distribution:
     print("using kld loss...")
-    model.compile(optimizer=rmsProp,loss='kld', metrics=['accuracy'])
+    model.compile(optimizer=rmsProp,loss='kld', metrics=['accuracy'],loss_weights=[1., 0.2])
 else:
     print("using categorical crossentropy loss...")
-    model.compile(optimizer=rmsProp,loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=rmsProp,loss='categorical_crossentropy', metrics=['accuracy'],loss_weights=[1., 0.2])
+
 
 time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-checkpointer = ModelCheckpoint(filepath="weights/joint_multigap_distribution_weights_aes_only_sgd{}.h5".format(time_now), verbose=1, save_best_only=False)
-reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=3)
-csv_logger = CSVLogger('logs/joint_multigap_distribution_weights_aes_only_sgd{}.log'.format(time_now))
+
+model_identifier = "weighted_joint_distribution_2layer_gru"
+unique_model_identifier = "{} - {}".format(time_now, model_identifier)
+
+checkpointer = ModelCheckpoint(filepath="weights/{}.h5".format(unique_model_identifier), verbose=1, save_best_only=True)
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=2)
+csv_logger = CSVLogger('logs/{}.log'.format(unique_model_identifier))
 
 # class_weight = {0 : 0.67, 1: 0.33}
 # model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch",
 #  validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
 
-model.fit(X_train,[Y_train, Y_train_semantics],nb_epoch=20, batch_size=32, shuffle="batch",
- validation_data=(X_test, [Y_test,Y_test_semantics]), callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
+model.fit([X_train,X_train_text],[Y_train, Y_train_semantics],
+    nb_epoch=20, batch_size=32, shuffle="batch",
+    validation_data=([X_test,X_test_text], [Y_test,Y_test_semantics]),
+    callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
 
 from keras.utils.visualize_util import plot
-plot(model, to_file='model_multigap_joint_distribution.png',show_shapes=True)
+plot(model, to_file='{}.png'.format(unique_model_identifier),show_shapes=True)
 
 model = create_googlenet('weights/gap_distribution_weights_aes_only_sgd2016-12-31 14:53:03.h5',
  use_distribution=use_distribution,use_multigap=True,heatmap=False)
