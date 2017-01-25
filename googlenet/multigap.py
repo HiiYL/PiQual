@@ -23,12 +23,14 @@ from keras.layers import Input, Embedding, LSTM, Dense, Activation, GRU,Convolut
 from keras.layers.pooling import GlobalAveragePooling2D, GlobalMaxPooling2D,GlobalMaxPooling1D
 from keras.models import Model
 from keras.regularizers import l2
-from keras.optimizers import SGD, RMSprop
+from keras.optimizers import SGD, RMSprop,Adam
 from keras.utils.np_utils import to_categorical
 from keras.callbacks import CSVLogger, ReduceLROnPlateau, ModelCheckpoint
 
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
+
+from keras.preprocessing.image import ImageDataGenerator
 
 
 from googlenet_custom_layers import PoolHelper,LRN
@@ -263,7 +265,7 @@ def evaluate_distribution_accuracy(model, X_test, Y_test):
 
 
 
-def create_googlenet(weights_path=None, use_distribution=False, use_multigap=False,use_semantics=False, use_comments=False, embedding_layer=None,heatmap=False):
+def create_googlenet(weights_path=None, use_distribution=False, use_multigap=False,use_semantics=False, use_comments=False, embedding_layer=None, extra_conv_layer=False):
 
     input_image = Input(shape=(3, 224, 224))
 
@@ -326,7 +328,11 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
     inception_4a_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='inception_4a/pool')(pool3_3x3_s2)
     inception_4a_pool_proj = Convolution2D(64,1,1,border_mode='same',activation='relu',name='inception_4a/pool_proj',W_regularizer=l2(0.0002))(inception_4a_pool)
     inception_4a_output = merge([inception_4a_1x1,inception_4a_3x3,inception_4a_5x5,inception_4a_pool_proj],mode='concat',concat_axis=1,name='inception_4a/output')
-    inception_4a_gap = GlobalAveragePooling2D()(inception_4a_output)
+
+    if extra_conv_layer:
+        conv_4a_output = Convolution2D(624, 3, 3, activation='relu',name='conv_4a',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4a_output)
+
+    inception_4a_gap = GlobalAveragePooling2D()(conv_4a_output)
 
 
     inception_4b_1x1 = Convolution2D(160,1,1,border_mode='same',activation='relu',name='inception_4b/1x1',W_regularizer=l2(0.0002))(inception_4a_output)
@@ -337,7 +343,12 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
     inception_4b_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='inception_4b/pool')(inception_4a_output)
     inception_4b_pool_proj = Convolution2D(64,1,1,border_mode='same',activation='relu',name='inception_4b/pool_proj',W_regularizer=l2(0.0002))(inception_4b_pool)
     inception_4b_output = merge([inception_4b_1x1,inception_4b_3x3,inception_4b_5x5,inception_4b_pool_proj],mode='concat',concat_axis=1,name='inception_4b_output')
-    inception_4b_gap = GlobalAveragePooling2D()(inception_4b_output)
+
+    if extra_conv_layer:
+        conv_4b_output = Convolution2D(648, 3, 3, activation='relu',name='conv_4b',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4b_output)
+
+    inception_4b_gap = GlobalAveragePooling2D()(conv_4b_output)
+
 
 
     inception_4c_1x1 = Convolution2D(128,1,1,border_mode='same',activation='relu',name='inception_4c/1x1',W_regularizer=l2(0.0002))(inception_4b_output)
@@ -348,7 +359,12 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
     inception_4c_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='inception_4c/pool')(inception_4b_output)
     inception_4c_pool_proj = Convolution2D(64,1,1,border_mode='same',activation='relu',name='inception_4c/pool_proj',W_regularizer=l2(0.0002))(inception_4c_pool)
     inception_4c_output = merge([inception_4c_1x1,inception_4c_3x3,inception_4c_5x5,inception_4c_pool_proj],mode='concat',concat_axis=1,name='inception_4c/output')
-    inception_4c_gap = GlobalAveragePooling2D()(inception_4c_output)
+
+    if extra_conv_layer:
+        conv_4c_output = Convolution2D(663, 3, 3, activation='relu',name='conv_4c',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4c_output)
+    inception_4c_gap = GlobalAveragePooling2D()(conv_4c_output)
+
+
 
 
     inception_4d_1x1 = Convolution2D(112,1,1,border_mode='same',activation='relu',name='inception_4d/1x1',W_regularizer=l2(0.0002))(inception_4c_output)
@@ -359,7 +375,11 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
     inception_4d_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='inception_4d/pool')(inception_4c_output)
     inception_4d_pool_proj = Convolution2D(64,1,1,border_mode='same',activation='relu',name='inception_4d/pool_proj',W_regularizer=l2(0.0002))(inception_4d_pool)
     inception_4d_output = merge([inception_4d_1x1,inception_4d_3x3,inception_4d_5x5,inception_4d_pool_proj],mode='concat',concat_axis=1,name='inception_4d/output')
-    inception_4d_gap = GlobalAveragePooling2D()(inception_4d_output)
+
+    if extra_conv_layer:
+        conv_4d_output = Convolution2D(704, 3, 3, activation='relu',name='conv_4d',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4d_output)
+
+    inception_4d_gap = GlobalAveragePooling2D()(conv_4d_output)
 
     if use_semantics:
         inception_4e_1x1_aesthetics = Convolution2D(256,1,1,border_mode='same',activation='relu',name='inception_4e/1x1_aesthetics',W_regularizer=l2(0.0002))(inception_4d_output)
@@ -444,27 +464,40 @@ use_semantics = False
 # X_train, Y_train, X_test, Y_test = prepareData(use_distribution=use_distribution)
 X_train, Y_train,X_test, Y_test,X_train_text, X_test_text,embedding_layer= prepareData(use_distribution=use_distribution, use_semantics=use_semantics, use_comments=True)
 
+
+
+# CURRENT MODEL
+# model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
+#  use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True,use_comments=True,
+#   embedding_layer=embedding_layer, heatmap=False)
+
+# model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
+#  use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True, heatmap=False)
+
+# MODEL WITH EXTRA CONV AND NO TEXT
 model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
  use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True,use_comments=True,
-  embedding_layer=embedding_layer, heatmap=False)
-# sgd = SGD(lr=0.001, decay=5e-4, momentum=0.9, nesterov=True)
-rmsProp = RMSprop(lr=0.00001, rho=0.9, epsilon=1e-08, decay=0.0)
+  embedding_layer=embedding_layer,extra_conv_layer=True)
+
+
+# rmsProp = RMSprop(lr=0.0001,clipnorm=1.,clipvalue=0.5)
+adam = Adam(lr=0.0001,clipnorm=1.,clipvalue=0.5)
 
 if use_distribution:
     print("using kld loss...")
-    model.compile(optimizer=rmsProp,loss='kld', metrics=['accuracy'])#,loss_weights=[1., 0.2])
+    model.compile(optimizer=adam,loss='kld', metrics=['accuracy'])#,loss_weights=[1., 0.2])
 else:
     print("using categorical crossentropy loss...")
-    model.compile(optimizer=rmsProp,loss='categorical_crossentropy', metrics=['accuracy'])#,loss_weights=[1., 0.2])
+    model.compile(optimizer=adam,loss='categorical_crossentropy', metrics=['accuracy'])#,loss_weights=[1., 0.2])
 
 
 time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-model_identifier = "distribution_2layer_gru"
+model_identifier = "distribution_2layergru_extra_conv_layer"
 unique_model_identifier = "{} - {}".format(time_now, model_identifier)
 
 checkpointer = ModelCheckpoint(filepath="weights/{}.h5".format(unique_model_identifier), verbose=1, save_best_only=True)
-reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=2)
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,patience=3)
 csv_logger = CSVLogger('logs/{}.log'.format(unique_model_identifier))
 
 # class_weight = {0 : 0.67, 1: 0.33}
@@ -476,15 +509,101 @@ model.fit([X_train,X_train_text],Y_train,
     validation_data=([X_test,X_test_text], Y_test),
     callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
 
+
+
+
+# datagen = ImageDataGenerator(
+#     featurewise_center=True,
+#     featurewise_std_normalization=True,
+#     zoom_range=[0.9,1.1],
+#     horizontal_flip=True)
+
+# datagen.fit(X_train)
+
+# model.fit_generator(datagen.flow(X_train, Y_train, batch_size=32),
+#                     samples_per_epoch=len(X_train), nb_epoch=20)
+
+
 from keras.utils.visualize_util import plot
 plot(model, to_file='{}.png'.format(unique_model_identifier),show_shapes=True)
 
-model = create_googlenet('weights/gap_distribution_weights_aes_only_sgd2016-12-31 14:53:03.h5',
- use_distribution=use_distribution,use_multigap=True,heatmap=False)
+
+
+from keras import backend as K
+def get_output_layer(model, layer_name):
+    # get the symbolic outputs of each "key" layer (we gave them unique names).
+    layer_dict = dict([(layer.name, layer) for layer in model.layers])
+    layer = layer_dict[layer_name]
+    return layer
+
+model = create_googlenet('weights/2017-01-12 00:08:31 - distribution_2layer_gru.h5',
+ use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True,use_comments=True,
+  embedding_layer=embedding_layer,extra_conv_layer=True)
+
+# input_path = ""
+
+# original_img = cv2.imread(input_path).astype(np.float32)
+
+# width, height, _ = original_img.shape
+
+# im = process_image(cv2.resize(original_img,(224,224)))
+
+# img = X_test[:2]
+# comments = X_t
+
+class_weights = model.layers[-1].get_weights()[0]
+
+final_conv_layer = get_output_layer(model, "conv_6_1")
+# get_output = K.function( [ model.inputs[0], model.inputs[1],K.learning_phase() ] , [final_conv_layer.output, model.layers[-1].output])
+get_output = K.function( [ model.inputs[0],K.learning_phase() ] , [final_conv_layer.output, model.layers[-1].output])
+
+
+for i in range(1,50):
+    image_to_visualize_idx = i
+    # [conv_outputs, predictions] = get_output( [np.expand_dims(X_test[image_to_visualize_idx],axis=0), np.expand_dims(X_test_text[image_to_visualize_idx],axis=0), 0])
+    [conv_outputs, predictions] = get_output( [np.expand_dims(X_test[image_to_visualize_idx],axis=0), 0])
+
+    transposed = X_test[image_to_visualize_idx].transpose((1,2,0))
+
+    conv_outputs = conv_outputs[0, :, :, :]
+    cam = np.zeros(dtype = np.float32, shape = conv_outputs.shape[1:3])
+
+    class_weights_to_visualize = class_weights[:, 0:5].sum(axis=1)
+    for i, w in enumerate(class_weights_to_visualize):
+        if not i >= conv_outputs.shape[0]:
+            cam += w * conv_outputs[i, :, :]
+        else:
+            break
+    height = 224
+    width = 224
+    cam /= np.max(cam)
+    cam = cv2.resize(cam, (height, width))
+    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+    heatmap[np.where(cam < 0.2)] = 0
+    img_bad = heatmap*0.5 + transposed
+
+    cam = np.zeros(dtype = np.float32, shape = conv_outputs.shape[1:3])
+    class_weights_to_visualize = class_weights[:, 5:10].sum(axis=1)
+    for i, w in enumerate(class_weights_to_visualize):
+        if not i >= conv_outputs.shape[0]:
+            cam += w * conv_outputs[i, :, :]
+        else:
+            break
+    height = 224
+    width = 224
+    cam /= np.max(cam)
+    cam = cv2.resize(cam, (height, width))
+    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+    heatmap[np.where(cam < 0.2)] = 0
+    img_good = heatmap*0.5 + transposed
+
+    cv2.imwrite("heatmaps/heatmap - notext - {}.png".format(image_to_visualize_idx), np.concatenate((img_bad, img_good), axis=1))
 
 model.evaluate(X_test,Y_test)
-accuracy = evaluate_distribution_accuracy(model, [X_test,X_test_text], Y_test)
+# accuracy = evaluate_distribution_accuracy(model, [X_test,X_test_text], Y_test)
 
+
+accuracy = evaluate_distribution_accuracy(model, [X_test,X_test_text], Y_test)
 
 
 
