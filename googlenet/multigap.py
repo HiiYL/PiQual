@@ -469,7 +469,7 @@ X_train, Y_train,X_test, Y_test,X_train_text, X_test_text,embedding_layer= prepa
 # CURRENT MODEL
 # model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
 #  use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True,use_comments=True,
-#   embedding_layer=embedding_layer, heatmap=False)
+#   embedding_layer=embedding_layer)
 
 # model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
 #  use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True, heatmap=False)
@@ -646,9 +646,10 @@ for comment_idx, index in enumerate(ava_test[:images_to_show].index):
         heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
         heatmap[np.where(cam < 0.2)] = 0
         img_cam = heatmap*0.5 + original_img
+        print("CALLED CONCATENATE")
         output_image = np.concatenate((output_image, img_cam), axis=1)
 
-    cv2.imwrite("heatmaps/heatmap - no_weights - {} - 4a.png".format(index), output_image)
+    cv2.imwrite("heatmaps/heatmap - {} - 4a.png".format(index), output_image)
 
 
 
