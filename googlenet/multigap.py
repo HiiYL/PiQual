@@ -553,100 +553,104 @@ model = create_googlenet('weights/2017-01-25 22_56_09 - distribution_2layergru_e
 
 class_weights = model.layers[-1].get_weights()[0]
 
+
+gap_conv_layer_4a = get_output_layer(model, "conv_4a")
+gap_conv_layer_4b = get_output_layer(model, "conv_4b")
+gap_conv_layer_4c = get_output_layer(model, "conv_4c")
+gap_conv_layer_4d = get_output_layer(model, "conv_4d")
+
 final_conv_layer = get_output_layer(model, "conv_6_1")
-# get_output = K.function( [ model.inputs[0], model.inputs[1],K.learning_phase() ] , [final_conv_layer.output, model.layers[-1].output])
-get_output = K.function( [ model.inputs[0],K.learning_phase() ] , [final_conv_layer.output, model.layers[-1].output])
+get_output = K.function( 
+    [ model.inputs[0], model.inputs[1],K.learning_phase() ] ,
+     [final_conv_layer.output,gap_conv_layer_4a.output,
+     gap_conv_layer_4b.output,gap_conv_layer_4c.output,
+     gap_conv_layer_4d.output, model.layers[-1].output])
+# get_output = K.function( [ model.inputs[0],K.learning_phase() ] , [final_conv_layer.output, model.layers[-1].output])
 
 
-for i in range(1,50):
-    image_to_visualize_idx = i
-    # [conv_outputs, predictions] = get_output( [np.expand_dims(X_test[image_to_visualize_idx],axis=0), np.expand_dims(X_test_text[image_to_visualize_idx],axis=0), 0])
-    [conv_outputs, predictions] = get_output( [np.expand_dims(X_test[image_to_visualize_idx],axis=0), 0])
+# for i in range(1,50):
+#     image_to_visualize_idx = i
+#     # [conv_outputs, predictions] = get_output( [np.expand_dims(X_test[image_to_visualize_idx],axis=0), np.expand_dims(X_test_text[image_to_visualize_idx],axis=0), 0])
+#     [conv_outputs, predictions] = get_output( [np.expand_dims(X_test[image_to_visualize_idx],axis=0), 0])
 
-    transposed = X_test[image_to_visualize_idx].transpose((1,2,0))
+#     transposed = X_test[image_to_visualize_idx].transpose((1,2,0))
 
-    conv_outputs = conv_outputs[0, :, :, :]
-    cam = np.zeros(dtype = np.float32, shape = conv_outputs.shape[1:3])
+#     conv_outputs = conv_outputs[0, :, :, :]
+#     cam = np.zeros(dtype = np.float32, shape = conv_outputs.shape[1:3])
 
-    class_weights_to_visualize = class_weights[:, 0:5].sum(axis=1)
-    for i, w in enumerate(class_weights_to_visualize):
-        if not i >= conv_outputs.shape[0]:
-            cam += w * conv_outputs[i, :, :]
-        else:
-            break
-    height = 224
-    width = 224
-    cam /= np.max(cam)
-    cam = cv2.resize(cam, (height, width))
-    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-    heatmap[np.where(cam < 0.2)] = 0
-    img_bad = heatmap*0.5 + transposed
+#     class_weights_to_visualize = class_weights[:, 0:5].sum(axis=1)
+#     for i, w in enumerate(class_weights_to_visualize):
+#         if not i >= conv_outputs.shape[0]:
+#             cam += w * conv_outputs[i, :, :]
+#         else:
+#             break
+#     height = 224
+#     width = 224
+#     cam /= np.max(cam)
+#     cam = cv2.resize(cam, (height, width))
+#     heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+#     heatmap[np.where(cam < 0.2)] = 0
+#     img_bad = heatmap*0.5 + transposed
 
-    cam = np.zeros(dtype = np.float32, shape = conv_outputs.shape[1:3])
-    class_weights_to_visualize = class_weights[:, 5:10].sum(axis=1)
-    for i, w in enumerate(class_weights_to_visualize):
-        if not i >= conv_outputs.shape[0]:
-            cam += w * conv_outputs[i, :, :]
-        else:
-            break
-    height = 224
-    width = 224
-    cam /= np.max(cam)
-    cam = cv2.resize(cam, (height, width))
-    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-    heatmap[np.where(cam < 0.2)] = 0
-    img_good = heatmap*0.5 + transposed
+#     cam = np.zeros(dtype = np.float32, shape = conv_outputs.shape[1:3])
+#     class_weights_to_visualize = class_weights[:, 5:10].sum(axis=1)
+#     for i, w in enumerate(class_weights_to_visualize):
+#         if not i >= conv_outputs.shape[0]:
+#             cam += w * conv_outputs[i, :, :]
+#         else:
+#             break
+#     height = 224
+#     width = 224
+#     cam /= np.max(cam)
+#     cam = cv2.resize(cam, (height, width))
+#     heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+#     heatmap[np.where(cam < 0.2)] = 0
+#     img_good = heatmap*0.5 + transposed
 
-    cv2.imwrite("heatmaps/heatmap - notext - {}.png".format(image_to_visualize_idx), np.concatenate((img_bad, img_good), axis=1))
-
-
-
-for i in range(1,50):
-    image_to_visualize_idx = i
-    # [conv_outputs, predictions] = get_output( [np.expand_dims(X_test[image_to_visualize_idx],axis=0), np.expand_dims(X_test_text[image_to_visualize_idx],axis=0), 0])
-    [conv_outputs, predictions] = get_output( [np.expand_dims(X_test[image_to_visualize_idx],axis=0), 0])
-
-    transposed = X_test[image_to_visualize_idx].transpose((1,2,0))
-
-    conv_outputs = conv_outputs[0, :, :, :]
-    cam = np.zeros(dtype = np.float32, shape = conv_outputs.shape[1:3])
-
-    class_weights_to_visualize = class_weights[:, 0:5].sum(axis=1)
-    for i, w in enumerate(class_weights_to_visualize):
-        if not i >= conv_outputs.shape[0]:
-            cam += w * conv_outputs[i, :, :]
-        else:
-            break
-    height = 224
-    width = 224
-    cam /= np.max(cam)
-    cam = cv2.resize(cam, (height, width))
-    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-    heatmap[np.where(cam < 0.2)] = 0
-    img_bad = heatmap*0.5 + transposed
-
-    cam = np.zeros(dtype = np.float32, shape = conv_outputs.shape[1:3])
-    class_weights_to_visualize = class_weights[:, 5:10].sum(axis=1)
-    for i, w in enumerate(class_weights_to_visualize):
-        if not i >= conv_outputs.shape[0]:
-            cam += w * conv_outputs[i, :, :]
-        else:
-            break
-    height = 224
-    width = 224
-    cam /= np.max(cam)
-    cam = cv2.resize(cam, (height, width))
-    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-    heatmap[np.where(cam < 0.2)] = 0
-    img_good = heatmap*0.5 + transposed
-
-    cv2.imwrite("heatmaps/heatmap - notext - {}.png".format(image_to_visualize_idx), np.concatenate((img_bad, img_good), axis=1))
+#     cv2.imwrite("heatmaps/heatmap - notext - {}.png".format(image_to_visualize_idx), np.concatenate((img_bad, img_good), axis=1))
 
 
 
-for index in ava_test[-25:][::-1].index:
-    input_path = "../../Aesthetics-Mash/test_images/{}.jpg".format(index)
+class_weights = model.layers[-1].get_weights()[0]
+
+
+images_to_show = 25
+X_test_text_used = X_test_text[:images_to_show]
+for comment_idx, index in enumerate(ava_test[:images_to_show].index):
+    input_path = "../dataset/test_images/{}.jpg".format(index)
     original_img = cv2.imread(input_path).astype(np.float32)
+
+    im = process_image(cv2.resize(original_img,(224,224)))
+
+    [conv_outputs, gap_conv_outputs_4a,gap_conv_outputs_4b,
+    gap_conv_outputs_4c,gap_conv_outputs_4d, predictions] = get_output( [im,
+        np.expand_dims(X_test_text_used[comment_idx], axis=0),
+         0])
+
+    conv_to_visualize = gap_conv_outputs_4a[0, :, :, :]
+    
+
+    # class_weights_to_visualize = [ class_weights[:, 0:5].sum(axis=1), class_weights[:, 5:10].sum(axis=1) ]
+
+    class_weights_to_visualize = class_weights[1324:1948,0:10]
+
+    output_image = original_img.copy()
+
+    for class_weight in class_weights_to_visualize.T:
+        cam = np.zeros(dtype = np.float32, shape = conv_to_visualize.shape[1:3])
+        for i, w in enumerate(class_weight):
+            cam += w * conv_to_visualize[i, :, :]
+        width, height,_ = original_img.shape
+        cam /= np.max(cam)
+        cam = cv2.resize(cam, (height, width))
+        heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+        heatmap[np.where(cam < 0.2)] = 0
+        img_cam = heatmap*0.5 + original_img
+        output_image = np.concatenate((output_image, img_cam), axis=1)
+
+    cv2.imwrite("heatmaps/heatmap - no_weights - {} - 4a.png".format(index), output_image)
+
+
 
 
 # model.evaluate(X_test,Y_test)
