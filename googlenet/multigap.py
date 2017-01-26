@@ -536,8 +536,8 @@ def get_output_layer(model, layer_name):
     layer = layer_dict[layer_name]
     return layer
 
-model = create_googlenet('weights/2017-01-12 00:08:31 - distribution_2layer_gru.h5',
- use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True,use_comments=True,
+model = create_googlenet('weights/2017-01-25 22_56_09 - distribution_2layergru_extra_conv_layer.h5',
+ use_distribution=use_distribution, use_semantics=False,use_multigap=True,use_comments=True,
   embedding_layer=embedding_layer,extra_conv_layer=True)
 
 # input_path = ""
@@ -599,7 +599,57 @@ for i in range(1,50):
 
     cv2.imwrite("heatmaps/heatmap - notext - {}.png".format(image_to_visualize_idx), np.concatenate((img_bad, img_good), axis=1))
 
-model.evaluate(X_test,Y_test)
+
+
+for i in range(1,50):
+    image_to_visualize_idx = i
+    # [conv_outputs, predictions] = get_output( [np.expand_dims(X_test[image_to_visualize_idx],axis=0), np.expand_dims(X_test_text[image_to_visualize_idx],axis=0), 0])
+    [conv_outputs, predictions] = get_output( [np.expand_dims(X_test[image_to_visualize_idx],axis=0), 0])
+
+    transposed = X_test[image_to_visualize_idx].transpose((1,2,0))
+
+    conv_outputs = conv_outputs[0, :, :, :]
+    cam = np.zeros(dtype = np.float32, shape = conv_outputs.shape[1:3])
+
+    class_weights_to_visualize = class_weights[:, 0:5].sum(axis=1)
+    for i, w in enumerate(class_weights_to_visualize):
+        if not i >= conv_outputs.shape[0]:
+            cam += w * conv_outputs[i, :, :]
+        else:
+            break
+    height = 224
+    width = 224
+    cam /= np.max(cam)
+    cam = cv2.resize(cam, (height, width))
+    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+    heatmap[np.where(cam < 0.2)] = 0
+    img_bad = heatmap*0.5 + transposed
+
+    cam = np.zeros(dtype = np.float32, shape = conv_outputs.shape[1:3])
+    class_weights_to_visualize = class_weights[:, 5:10].sum(axis=1)
+    for i, w in enumerate(class_weights_to_visualize):
+        if not i >= conv_outputs.shape[0]:
+            cam += w * conv_outputs[i, :, :]
+        else:
+            break
+    height = 224
+    width = 224
+    cam /= np.max(cam)
+    cam = cv2.resize(cam, (height, width))
+    heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+    heatmap[np.where(cam < 0.2)] = 0
+    img_good = heatmap*0.5 + transposed
+
+    cv2.imwrite("heatmaps/heatmap - notext - {}.png".format(image_to_visualize_idx), np.concatenate((img_bad, img_good), axis=1))
+
+
+
+for index in ava_test[-25:][::-1].index:
+    input_path = "../../Aesthetics-Mash/test_images/{}.jpg".format(index)
+    original_img = cv2.imread(input_path).astype(np.float32)
+
+
+# model.evaluate(X_test,Y_test)
 # accuracy = evaluate_distribution_accuracy(model, [X_test,X_test_text], Y_test)
 
 
