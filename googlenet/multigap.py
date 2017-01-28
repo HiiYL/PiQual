@@ -627,12 +627,12 @@ for comment_idx, index in enumerate(ava_test[:images_to_show].index):
         np.expand_dims(X_test_text_used[comment_idx], axis=0),
          0])
 
-    conv_to_visualize = gap_conv_outputs_4a[0, :, :, :]
+    conv_to_visualize = gap_conv_outputs_4b[0, :, :, :]
     
 
     # class_weights_to_visualize = [ class_weights[:, 0:5].sum(axis=1), class_weights[:, 5:10].sum(axis=1) ]
 
-    class_weights_to_visualize = class_weights[1324:1948,0:10]
+    class_weights_to_visualize = class_weights[1948:2596,0:10]
 
     output_image = original_img.copy()
 
@@ -649,7 +649,7 @@ for comment_idx, index in enumerate(ava_test[:images_to_show].index):
         print("CALLED CONCATENATE")
         output_image = np.concatenate((output_image, img_cam), axis=1)
 
-    cv2.imwrite("heatmaps/heatmap - {} - 4a.png".format(index), output_image)
+    cv2.imwrite("heatmaps/heatmap - {} - 4b - new.png".format(index), output_image)
 
 
 
