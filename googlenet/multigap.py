@@ -265,9 +265,13 @@ def evaluate_distribution_accuracy(model, X_test, Y_test):
 
 
 
-def create_googlenet(weights_path=None, use_distribution=False, use_multigap=False,use_semantics=False, use_comments=False, embedding_layer=None, extra_conv_layer=False):
+def create_googlenet(weights_path=None, use_distribution=False, use_multigap=False,use_semantics=False, rapid_style=False, use_comments=False, embedding_layer=None, extra_conv_layer=False):
 
     input_image = Input(shape=(3, 224, 224))
+
+    if rapid_style:
+        if not use_semantics:
+            print("[WARN] Semantics is not enabled, rapid style parameter will be ignored")
 
     if use_comments:
         if embedding_layer is None:
@@ -331,8 +335,7 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
 
     if extra_conv_layer:
         conv_4a_output = Convolution2D(624, 3, 3, activation='relu',name='conv_4a',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4a_output)
-
-    inception_4a_gap = GlobalAveragePooling2D()(conv_4a_output)
+        inception_4a_gap = GlobalAveragePooling2D()(conv_4a_output)
 
 
     inception_4b_1x1 = Convolution2D(160,1,1,border_mode='same',activation='relu',name='inception_4b/1x1',W_regularizer=l2(0.0002))(inception_4a_output)
@@ -346,8 +349,7 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
 
     if extra_conv_layer:
         conv_4b_output = Convolution2D(648, 3, 3, activation='relu',name='conv_4b',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4b_output)
-
-    inception_4b_gap = GlobalAveragePooling2D()(conv_4b_output)
+        inception_4b_gap = GlobalAveragePooling2D()(conv_4b_output)
 
 
 
@@ -362,7 +364,7 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
 
     if extra_conv_layer:
         conv_4c_output = Convolution2D(663, 3, 3, activation='relu',name='conv_4c',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4c_output)
-    inception_4c_gap = GlobalAveragePooling2D()(conv_4c_output)
+        inception_4c_gap = GlobalAveragePooling2D()(conv_4c_output)
 
 
 
@@ -378,8 +380,7 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
 
     if extra_conv_layer:
         conv_4d_output = Convolution2D(704, 3, 3, activation='relu',name='conv_4d',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4d_output)
-
-    inception_4d_gap = GlobalAveragePooling2D()(conv_4d_output)
+        inception_4d_gap = GlobalAveragePooling2D()(conv_4d_output)
 
     if use_semantics:
         inception_4e_1x1_aesthetics = Convolution2D(256,1,1,border_mode='same',activation='relu',name='inception_4e/1x1_aesthetics',W_regularizer=l2(0.0002))(inception_4d_output)
@@ -392,6 +393,80 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
         inception_4e_output_aesthetics = merge([inception_4e_1x1_aesthetics,inception_4e_3x3_aesthetics,inception_4e_5x5_aesthetics,inception_4e_pool_proj_aesthetics],mode='concat',concat_axis=1,name='inception_4e/output_aesthetics')
         conv_output_aesthetics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output_aesthetics)
         
+        if rapid_style:
+            conv1_7x7_s2 = Convolution2D(64,7,7,subsample=(2,2),border_mode='same',activation='relu',name='semantic_conv1/7x7_s2',W_regularizer=l2(0.0002))(input_image)
+            conv1_zero_pad = ZeroPadding2D(padding=(1, 1))(conv1_7x7_s2)
+            pool1_helper = PoolHelper()(conv1_zero_pad)
+            pool1_3x3_s2 = MaxPooling2D(pool_size=(3,3),strides=(2,2),border_mode='valid',name='semantic_pool1/3x3_s2')(pool1_helper)
+            pool1_norm1 = LRN(name='semantic_pool1/norm1')(pool1_3x3_s2)
+            conv2_3x3_reduce = Convolution2D(64,1,1,border_mode='same',activation='relu',name='semantic_conv2/3x3_reduce',W_regularizer=l2(0.0002))(pool1_norm1)
+            conv2_3x3 = Convolution2D(192,3,3,border_mode='same',activation='relu',name='semantic_conv2/3x3',W_regularizer=l2(0.0002))(conv2_3x3_reduce)
+            conv2_norm2 = LRN(name='semantic_conv2/norm2')(conv2_3x3)
+            conv2_zero_pad = ZeroPadding2D(padding=(1, 1))(conv2_norm2)
+            pool2_helper = PoolHelper()(conv2_zero_pad)
+            pool2_3x3_s2 = MaxPooling2D(pool_size=(3,3),strides=(2,2),border_mode='valid',name='semantic_pool2/3x3_s2')(pool2_helper)
+            
+            inception_3a_1x1 = Convolution2D(64,1,1,border_mode='same',activation='relu',name='semantic_inception_3a/1x1',W_regularizer=l2(0.0002))(pool2_3x3_s2)
+            inception_3a_3x3_reduce = Convolution2D(96,1,1,border_mode='same',activation='relu',name='semantic_inception_3a/3x3_reduce',W_regularizer=l2(0.0002))(pool2_3x3_s2)
+            inception_3a_3x3 = Convolution2D(128,3,3,border_mode='same',activation='relu',name='semantic_inception_3a/3x3',W_regularizer=l2(0.0002))(inception_3a_3x3_reduce)
+            inception_3a_5x5_reduce = Convolution2D(16,1,1,border_mode='same',activation='relu',name='semantic_inception_3a/5x5_reduce',W_regularizer=l2(0.0002))(pool2_3x3_s2)
+            inception_3a_5x5 = Convolution2D(32,5,5,border_mode='same',activation='relu',name='semantic_inception_3a/5x5',W_regularizer=l2(0.0002))(inception_3a_5x5_reduce)
+            inception_3a_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='semantic_inception_3a/pool')(pool2_3x3_s2)
+            inception_3a_pool_proj = Convolution2D(32,1,1,border_mode='same',activation='relu',name='semantic_inception_3a/pool_proj',W_regularizer=l2(0.0002))(inception_3a_pool)
+            inception_3a_output = merge([inception_3a_1x1,inception_3a_3x3,inception_3a_5x5,inception_3a_pool_proj],mode='concat',concat_axis=1,name='semantic_inception_3a/output')
+              
+            inception_3b_1x1 = Convolution2D(128,1,1,border_mode='same',activation='relu',name='semantic_inception_3b/1x1',W_regularizer=l2(0.0002))(inception_3a_output)
+            inception_3b_3x3_reduce = Convolution2D(128,1,1,border_mode='same',activation='relu',name='semantic_inception_3b/3x3_reduce',W_regularizer=l2(0.0002))(inception_3a_output)
+            inception_3b_3x3 = Convolution2D(192,3,3,border_mode='same',activation='relu',name='semantic_inception_3b/3x3',W_regularizer=l2(0.0002))(inception_3b_3x3_reduce)
+            inception_3b_5x5_reduce = Convolution2D(32,1,1,border_mode='same',activation='relu',name='semantic_inception_3b/5x5_reduce',W_regularizer=l2(0.0002))(inception_3a_output)
+            inception_3b_5x5 = Convolution2D(96,5,5,border_mode='same',activation='relu',name='semantic_inception_3b/5x5',W_regularizer=l2(0.0002))(inception_3b_5x5_reduce)
+            inception_3b_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='semantic_inception_3b/pool')(inception_3a_output)
+            inception_3b_pool_proj = Convolution2D(64,1,1,border_mode='same',activation='relu',name='semantic_inception_3b/pool_proj',W_regularizer=l2(0.0002))(inception_3b_pool)
+            inception_3b_output = merge([inception_3b_1x1,inception_3b_3x3,inception_3b_5x5,inception_3b_pool_proj],mode='concat',concat_axis=1,name='semantic_inception_3b/output')
+            
+            inception_3b_output_zero_pad = ZeroPadding2D(padding=(1, 1))(inception_3b_output)
+            pool3_helper = PoolHelper()(inception_3b_output_zero_pad)
+            pool3_3x3_s2 = MaxPooling2D(pool_size=(3,3),strides=(2,2),border_mode='valid',name='semantic_pool3/3x3_s2')(pool3_helper)
+            
+            inception_4a_1x1 = Convolution2D(192,1,1,border_mode='same',activation='relu',name='semantic_inception_4a/1x1',W_regularizer=l2(0.0002))(pool3_3x3_s2)
+            inception_4a_3x3_reduce = Convolution2D(96,1,1,border_mode='same',activation='relu',name='semantic_inception_4a/3x3_reduce',W_regularizer=l2(0.0002))(pool3_3x3_s2)
+            inception_4a_3x3 = Convolution2D(208,3,3,border_mode='same',activation='relu',name='semantic_inception_4a/3x3',W_regularizer=l2(0.0002))(inception_4a_3x3_reduce)
+            inception_4a_5x5_reduce = Convolution2D(16,1,1,border_mode='same',activation='relu',name='semantic_inception_4a/5x5_reduce',W_regularizer=l2(0.0002))(pool3_3x3_s2)
+            inception_4a_5x5 = Convolution2D(48,5,5,border_mode='same',activation='relu',name='semantic_inception_4a/5x5',W_regularizer=l2(0.0002))(inception_4a_5x5_reduce)
+            inception_4a_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='semantic_inception_4a/pool')(pool3_3x3_s2)
+            inception_4a_pool_proj = Convolution2D(64,1,1,border_mode='same',activation='relu',name='semantic_inception_4a/pool_proj',W_regularizer=l2(0.0002))(inception_4a_pool)
+            inception_4a_output = merge([inception_4a_1x1,inception_4a_3x3,inception_4a_5x5,inception_4a_pool_proj],mode='concat',concat_axis=1,name='semantic_inception_4a/output')
+             
+            inception_4b_1x1 = Convolution2D(160,1,1,border_mode='same',activation='relu',name='semantic_inception_4b/1x1',W_regularizer=l2(0.0002))(inception_4a_output)
+            inception_4b_3x3_reduce = Convolution2D(112,1,1,border_mode='same',activation='relu',name='semantic_inception_4b/3x3_reduce',W_regularizer=l2(0.0002))(inception_4a_output)
+            inception_4b_3x3 = Convolution2D(224,3,3,border_mode='same',activation='relu',name='semantic_inception_4b/3x3',W_regularizer=l2(0.0002))(inception_4b_3x3_reduce)
+            inception_4b_5x5_reduce = Convolution2D(24,1,1,border_mode='same',activation='relu',name='semantic_inception_4b/5x5_reduce',W_regularizer=l2(0.0002))(inception_4a_output)
+            inception_4b_5x5 = Convolution2D(64,5,5,border_mode='same',activation='relu',name='semantic_inception_4b/5x5',W_regularizer=l2(0.0002))(inception_4b_5x5_reduce)
+            inception_4b_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='semantic_inception_4b/pool')(inception_4a_output)
+            inception_4b_pool_proj = Convolution2D(64,1,1,border_mode='same',activation='relu',name='semantic_inception_4b/pool_proj',W_regularizer=l2(0.0002))(inception_4b_pool)
+            inception_4b_output = merge([inception_4b_1x1,inception_4b_3x3,inception_4b_5x5,inception_4b_pool_proj],mode='concat',concat_axis=1,name='semantic_inception_4b_output')
+            
+            
+            inception_4c_1x1 = Convolution2D(128,1,1,border_mode='same',activation='relu',name='semantic_inception_4c/1x1',W_regularizer=l2(0.0002))(inception_4b_output)
+            inception_4c_3x3_reduce = Convolution2D(128,1,1,border_mode='same',activation='relu',name='semantic_inception_4c/3x3_reduce',W_regularizer=l2(0.0002))(inception_4b_output)
+            inception_4c_3x3 = Convolution2D(256,3,3,border_mode='same',activation='relu',name='semantic_inception_4c/3x3',W_regularizer=l2(0.0002))(inception_4c_3x3_reduce)
+            inception_4c_5x5_reduce = Convolution2D(24,1,1,border_mode='same',activation='relu',name='semantic_inception_4c/5x5_reduce',W_regularizer=l2(0.0002))(inception_4b_output)
+            inception_4c_5x5 = Convolution2D(64,5,5,border_mode='same',activation='relu',name='semantic_inception_4c/5x5',W_regularizer=l2(0.0002))(inception_4c_5x5_reduce)
+            inception_4c_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='semantic_inception_4c/pool')(inception_4b_output)
+            inception_4c_pool_proj = Convolution2D(64,1,1,border_mode='same',activation='relu',name='semantic_inception_4c/pool_proj',W_regularizer=l2(0.0002))(inception_4c_pool)
+            inception_4c_output = merge([inception_4c_1x1,inception_4c_3x3,inception_4c_5x5,inception_4c_pool_proj],mode='concat',concat_axis=1,name='semantic_inception_4c/output')
+            
+            
+            inception_4d_1x1 = Convolution2D(112,1,1,border_mode='same',activation='relu',name='semantic_inception_4d/1x1',W_regularizer=l2(0.0002))(inception_4c_output)
+            inception_4d_3x3_reduce = Convolution2D(144,1,1,border_mode='same',activation='relu',name='semantic_inception_4d/3x3_reduce',W_regularizer=l2(0.0002))(inception_4c_output)
+            inception_4d_3x3 = Convolution2D(288,3,3,border_mode='same',activation='relu',name='semantic_inception_4d/3x3',W_regularizer=l2(0.0002))(inception_4d_3x3_reduce)
+            inception_4d_5x5_reduce = Convolution2D(32,1,1,border_mode='same',activation='relu',name='semantic_inception_4d/5x5_reduce',W_regularizer=l2(0.0002))(inception_4c_output)
+            inception_4d_5x5 = Convolution2D(64,5,5,border_mode='same',activation='relu',name='semantic_inception_4d/5x5',W_regularizer=l2(0.0002))(inception_4d_5x5_reduce)
+            inception_4d_pool = MaxPooling2D(pool_size=(3,3),strides=(1,1),border_mode='same',name='semantic_inception_4d/pool')(inception_4c_output)
+            inception_4d_pool_proj = Convolution2D(64,1,1,border_mode='same',activation='relu',name='semantic_inception_4d/pool_proj',W_regularizer=l2(0.0002))(inception_4d_pool)
+            inception_4d_output = merge([inception_4d_1x1,inception_4d_3x3,inception_4d_5x5,inception_4d_pool_proj],mode='concat',concat_axis=1,name='semantic_inception_4d/output')
+            
+
         inception_4e_1x1_semantics = Convolution2D(256,1,1,border_mode='same',activation='relu',name='inception_4e/1x1_semantics',W_regularizer=l2(0.0002))(inception_4d_output)
         inception_4e_3x3_reduce_semantics = Convolution2D(160,1,1,border_mode='same',activation='relu',name='inception_4e/3x3_reduce_semantics',W_regularizer=l2(0.0002))(inception_4d_output)
         inception_4e_3x3_semantics = Convolution2D(320,3,3,border_mode='same',activation='relu',name='inception_4e/3x3_semantics',W_regularizer=l2(0.0002))(inception_4e_3x3_reduce_semantics)
@@ -402,12 +477,12 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
         inception_4e_output_semantics = merge([inception_4e_1x1_semantics,inception_4e_3x3_semantics,inception_4e_5x5_semantics,inception_4e_pool_proj_semantics],mode='concat',concat_axis=1,name='inception_4e/output_semantics')
         conv_output_semantics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1_semantics',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output_semantics)
         
-        x_semantics = GlobalAveragePooling2D()(conv_output_semantics)
 
-        if use_comments:
-             x_semantics = merge([x_semantics, x_text_semantics],mode='concat',concat_axis=1)
-
-        output_semantics = Dense(65, activation = 'softmax', name="output_semantics")(x_semantics)
+        if not rapid_style:
+            x_semantics = GlobalAveragePooling2D()(conv_output_semantics)
+            if use_comments:
+                 x_semantics = merge([x_semantics, x_text_semantics],mode='concat',concat_axis=1)
+            output_semantics = Dense(65, activation = 'softmax', name="output_semantics")(x_semantics)
 
     else:
         inception_4e_1x1 = Convolution2D(256,1,1,border_mode='same',activation='relu',name='inception_4e/1x1',W_regularizer=l2(0.0002))(inception_4d_output)
@@ -420,7 +495,11 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
         inception_4e_output = merge([inception_4e_1x1,inception_4e_3x3,inception_4e_5x5,inception_4e_pool_proj],mode='concat',concat_axis=1,name='inception_4e/output')  
         conv_output_aesthetics = Convolution2D(1024, 3, 3, activation='relu',name='conv_6_1',border_mode = 'same',W_regularizer=l2(0.0002))(inception_4e_output)
     
-    x_aesthetics = GlobalAveragePooling2D()(conv_output_aesthetics)
+    if rapid_style:
+        merged_conv = merge([conv_output_aesthetics, conv_output_semantics], mode='concat', concat_axis=1)
+        x_aesthetics =  GlobalAveragePooling2D()(merged_conv)
+    else:
+        x_aesthetics = GlobalAveragePooling2D()(conv_output_aesthetics)
 
     if use_multigap:
         if use_comments:
@@ -439,7 +518,7 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
         else:
             output_aesthetics = Dense(2, activation = 'softmax', name="main_output")(x_aesthetics)
     
-    if use_semantics:
+    if use_semantics and not rapid_style:
         if use_comments:
             googlenet = Model(input=[input_image, comment_input], output=[output_aesthetics,output_semantics])
         else:
@@ -455,29 +534,41 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
             googlenet.load_weights('weights/named_googlenet_semantics_weights.h5', by_name=True)
         googlenet.load_weights(weights_path,by_name=True)
 
-    
+        if rapid_style:
+            for i, layer in enumerate(googlenet.layers):
+                if 'semantic' in layer.name:
+                    # print("{} - {}".format(i, layer.name))
+                    layer.trainable = False
+
     return googlenet
 
 
 use_distribution = True
-use_semantics = False
+use_semantics = True
 # X_train, Y_train, X_test, Y_test = prepareData(use_distribution=use_distribution)
-X_train, Y_train,X_test, Y_test,X_train_text, X_test_text,embedding_layer= prepareData(use_distribution=use_distribution, use_semantics=use_semantics, use_comments=True)
+# X_train, Y_train,X_test, Y_test,X_train_text, X_test_text,embedding_layer= prepareData(use_distribution=use_distribution, use_semantics=use_semantics, use_comments=True)
+X_train, Y_train,X_test, Y_test= prepareData(use_distribution=use_distribution, use_semantics=False)
 
 
 
 # CURRENT MODEL
 # model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
 #  use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True,use_comments=True,
-#   embedding_layer=embedding_layer)
+#   embedding_layer=embedding_layer,extra_conv_layer=True)
 
 # model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
 #  use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True, heatmap=False)
 
 # MODEL WITH EXTRA CONV AND NO TEXT
+# model = create_googlenet('weights/2017-01-27 12:41:36 - distribution_extra_conv_layer.h5',
+#  use_distribution=use_distribution, use_semantics=use_semantics,
+#  use_multigap=True,extra_conv_layer=True)
+
+
+# RAPID STYLE
 model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
- use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True,use_comments=True,
-  embedding_layer=embedding_layer,extra_conv_layer=True)
+ use_distribution=use_distribution, use_semantics=True,
+ use_multigap=False,extra_conv_layer=False, rapid_style=True)
 
 
 # rmsProp = RMSprop(lr=0.0001,clipnorm=1.,clipvalue=0.5)
@@ -493,7 +584,7 @@ else:
 
 time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-model_identifier = "distribution_2layergru_extra_conv_layer"
+model_identifier = "distribution_singlegap_rapidstyle"
 unique_model_identifier = "{} - {}".format(time_now, model_identifier)
 
 checkpointer = ModelCheckpoint(filepath="weights/{}.h5".format(unique_model_identifier), verbose=1, save_best_only=True)
@@ -504,12 +595,16 @@ csv_logger = CSVLogger('logs/{}.log'.format(unique_model_identifier))
 # model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch",
 #  validation_data=(X_test, Y_test), callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
 
-model.fit([X_train,X_train_text],Y_train,
+# model.fit([X_train,X_train_text],Y_train,
+#     nb_epoch=20, batch_size=32, shuffle="batch",
+#     validation_data=([X_test,X_test_text], Y_test),
+#     callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
+
+
+model.fit(X_train,Y_train,
     nb_epoch=20, batch_size=32, shuffle="batch",
-    validation_data=([X_test,X_test_text], Y_test),
+    validation_data=(X_test, Y_test),
     callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
-
-
 
 
 # datagen = ImageDataGenerator(
@@ -529,14 +624,9 @@ plot(model, to_file='{}.png'.format(unique_model_identifier),show_shapes=True)
 
 
 
-from keras import backend as K
-def get_output_layer(model, layer_name):
-    # get the symbolic outputs of each "key" layer (we gave them unique names).
-    layer_dict = dict([(layer.name, layer) for layer in model.layers])
-    layer = layer_dict[layer_name]
-    return layer
 
-model = create_googlenet('weights/2017-01-25 22_56_09 - distribution_2layergru_extra_conv_layer.h5',
+
+model = create_googlenet('weights/2017-01-25 22:56:09 - distribution_2layergru_extra_conv_layer.h5',
  use_distribution=use_distribution, use_semantics=False,use_multigap=True,use_comments=True,
   embedding_layer=embedding_layer,extra_conv_layer=True)
 
@@ -551,6 +641,13 @@ model = create_googlenet('weights/2017-01-25 22_56_09 - distribution_2layergru_e
 # img = X_test[:2]
 # comments = X_t
 
+from keras import backend as K
+def get_output_layer(model, layer_name):
+    # get the symbolic outputs of each "key" layer (we gave them unique names).
+    layer_dict = dict([(layer.name, layer) for layer in model.layers])
+    layer = layer_dict[layer_name]
+    return layer
+
 class_weights = model.layers[-1].get_weights()[0]
 
 
@@ -560,64 +657,63 @@ gap_conv_layer_4c = get_output_layer(model, "conv_4c")
 gap_conv_layer_4d = get_output_layer(model, "conv_4d")
 
 final_conv_layer = get_output_layer(model, "conv_6_1")
+
+# get_output = K.function( 
+#     [ model.inputs[0],K.learning_phase() ] ,
+#      [final_conv_layer.output,gap_conv_layer_4a.output,
+#      gap_conv_layer_4b.output,gap_conv_layer_4c.output,
+#      gap_conv_layer_4d.output, model.layers[-1].output])
+
 get_output = K.function( 
     [ model.inputs[0], model.inputs[1],K.learning_phase() ] ,
      [final_conv_layer.output,gap_conv_layer_4a.output,
      gap_conv_layer_4b.output,gap_conv_layer_4c.output,
      gap_conv_layer_4d.output, model.layers[-1].output])
-# get_output = K.function( [ model.inputs[0],K.learning_phase() ] , [final_conv_layer.output, model.layers[-1].output])
-
-
-# for i in range(1,50):
-#     image_to_visualize_idx = i
-#     # [conv_outputs, predictions] = get_output( [np.expand_dims(X_test[image_to_visualize_idx],axis=0), np.expand_dims(X_test_text[image_to_visualize_idx],axis=0), 0])
-#     [conv_outputs, predictions] = get_output( [np.expand_dims(X_test[image_to_visualize_idx],axis=0), 0])
-
-#     transposed = X_test[image_to_visualize_idx].transpose((1,2,0))
-
-#     conv_outputs = conv_outputs[0, :, :, :]
-#     cam = np.zeros(dtype = np.float32, shape = conv_outputs.shape[1:3])
-
-#     class_weights_to_visualize = class_weights[:, 0:5].sum(axis=1)
-#     for i, w in enumerate(class_weights_to_visualize):
-#         if not i >= conv_outputs.shape[0]:
-#             cam += w * conv_outputs[i, :, :]
-#         else:
-#             break
-#     height = 224
-#     width = 224
-#     cam /= np.max(cam)
-#     cam = cv2.resize(cam, (height, width))
-#     heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-#     heatmap[np.where(cam < 0.2)] = 0
-#     img_bad = heatmap*0.5 + transposed
-
-#     cam = np.zeros(dtype = np.float32, shape = conv_outputs.shape[1:3])
-#     class_weights_to_visualize = class_weights[:, 5:10].sum(axis=1)
-#     for i, w in enumerate(class_weights_to_visualize):
-#         if not i >= conv_outputs.shape[0]:
-#             cam += w * conv_outputs[i, :, :]
-#         else:
-#             break
-#     height = 224
-#     width = 224
-#     cam /= np.max(cam)
-#     cam = cv2.resize(cam, (height, width))
-#     heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-#     heatmap[np.where(cam < 0.2)] = 0
-#     img_good = heatmap*0.5 + transposed
-
-#     cv2.imwrite("heatmaps/heatmap - notext - {}.png".format(image_to_visualize_idx), np.concatenate((img_bad, img_good), axis=1))
 
 
 
 class_weights = model.layers[-1].get_weights()[0]
 
 
+# images_to_show = 25
+# for comment_idx, index in enumerate(ava_test[:images_to_show].index):
+#     input_path = "../dataset/AVA/data/{}.jpg".format(index)
+#     original_img = cv2.imread(input_path).astype(np.float32)
+
+#     im = process_image(cv2.resize(original_img,(224,224)))
+
+#     [conv_outputs, gap_conv_outputs_4a,gap_conv_outputs_4b,
+#     gap_conv_outputs_4c,gap_conv_outputs_4d, predictions] = get_output( [im,0])
+
+#     conv_to_visualize = gap_conv_outputs_4a[0, :, :, :]
+    
+
+#     # class_weights_to_visualize = [ class_weights[:, 0:5].sum(axis=1), class_weights[:, 5:10].sum(axis=1) ]
+
+#     class_weights_to_visualize = class_weights[1024:1648,0:10]
+
+#     output_image = original_img.copy()
+
+#     for class_weight in class_weights_to_visualize.T:
+#         cam = np.zeros(dtype = np.float32, shape = conv_to_visualize.shape[1:3])
+#         for i, w in enumerate(class_weight):
+#             cam += w * conv_to_visualize[i, :, :]
+#         width, height,_ = original_img.shape
+#         cam /= np.max(cam)
+#         cam = cv2.resize(cam, (height, width))
+#         heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+#         heatmap[np.where(cam < 0.2)] = 0
+#         img_cam = heatmap*0.5 + original_img
+#         print("CALLED CONCATENATE")
+#         output_image = np.concatenate((output_image, img_cam), axis=1)
+
+#     cv2.imwrite("heatmaps/heatmap - {} - 4a - notext.png".format(index), output_image)
+
+
 images_to_show = 25
 X_test_text_used = X_test_text[:images_to_show]
 for comment_idx, index in enumerate(ava_test[:images_to_show].index):
-    input_path = "../dataset/test_images/{}.jpg".format(index)
+    input_path = "../dataset/AVA/data/{}.jpg".format(index)
     original_img = cv2.imread(input_path).astype(np.float32)
 
     im = process_image(cv2.resize(original_img,(224,224)))
@@ -627,12 +723,12 @@ for comment_idx, index in enumerate(ava_test[:images_to_show].index):
         np.expand_dims(X_test_text_used[comment_idx], axis=0),
          0])
 
-    conv_to_visualize = gap_conv_outputs_4b[0, :, :, :]
+    conv_to_visualize = gap_conv_outputs_4a[0, :, :, :]
     
 
     # class_weights_to_visualize = [ class_weights[:, 0:5].sum(axis=1), class_weights[:, 5:10].sum(axis=1) ]
 
-    class_weights_to_visualize = class_weights[1948:2596,0:10]
+    class_weights_to_visualize = class_weights[1324:1948,0:10]
 
     output_image = original_img.copy()
 
@@ -649,7 +745,7 @@ for comment_idx, index in enumerate(ava_test[:images_to_show].index):
         print("CALLED CONCATENATE")
         output_image = np.concatenate((output_image, img_cam), axis=1)
 
-    cv2.imwrite("heatmaps/heatmap - {} - 4b - new.png".format(index), output_image)
+    cv2.imwrite("heatmaps/heatmap - {} - 4a.png".format(index), output_image)
 
 
 

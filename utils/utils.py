@@ -10,7 +10,7 @@ import numpy as np
 def copyTestSet(dest_dir="test_images/"):
   ava_path = "../dataset/AVA/data/"
   ava_data_path = os.path.join(os.getcwd(), ava_path)
-  store = HDFStore('dataset_h5/labels.h5')
+  store = HDFStore('../dataset_h5/labels.h5')
   test_labels = store['labels_test']
   imagesCount = test_labels.shape[0]
 
