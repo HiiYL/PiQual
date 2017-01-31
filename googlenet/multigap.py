@@ -265,7 +265,9 @@ def evaluate_distribution_accuracy(model, X_test, Y_test):
 
 
 
-def create_googlenet(weights_path=None, use_distribution=False, use_multigap=False,use_semantics=False, rapid_style=False, use_comments=False, embedding_layer=None, extra_conv_layer=False):
+def create_googlenet(weights_path=None, use_distribution=False, use_multigap=False,
+    use_semantics=False, rapid_style=False, use_comments=False, embedding_layer=None,
+     extra_conv_layer=False,load_weights_by_name=True):
 
     input_image = Input(shape=(3, 224, 224))
 
@@ -532,7 +534,7 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
     if weights_path:
         if use_semantics:
             googlenet.load_weights('weights/named_googlenet_semantics_weights.h5', by_name=True)
-        googlenet.load_weights(weights_path,by_name=True)
+        googlenet.load_weights(weights_path,by_name=load_weights_by_name)
 
         if rapid_style:
             for i, layer in enumerate(googlenet.layers):
@@ -626,20 +628,13 @@ plot(model, to_file='{}.png'.format(unique_model_identifier),show_shapes=True)
 
 
 
-model = create_googlenet('weights/2017-01-25 22:56:09 - distribution_2layergru_extra_conv_layer.h5',
- use_distribution=use_distribution, use_semantics=False,use_multigap=True,use_comments=True,
-  embedding_layer=embedding_layer,extra_conv_layer=True)
+# model = create_googlenet('weights/2017-01-25 22_56_09 - distribution_2layergru_extra_conv_layer.h5',
+#  use_distribution=use_distribution, use_semantics=False,use_multigap=True,use_comments=True,
+#   embedding_layer=embedding_layer,extra_conv_layer=True)
 
-# input_path = ""
-
-# original_img = cv2.imread(input_path).astype(np.float32)
-
-# width, height, _ = original_img.shape
-
-# im = process_image(cv2.resize(original_img,(224,224)))
-
-# img = X_test[:2]
-# comments = X_t
+model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
+ use_distribution=False, use_semantics=False,use_multigap=False,use_comments=False,
+  embedding_layer=None,extra_conv_layer=False,load_weights_by_name=False)
 
 from keras import backend as K
 def get_output_layer(model, layer_name):
@@ -651,10 +646,10 @@ def get_output_layer(model, layer_name):
 class_weights = model.layers[-1].get_weights()[0]
 
 
-gap_conv_layer_4a = get_output_layer(model, "conv_4a")
-gap_conv_layer_4b = get_output_layer(model, "conv_4b")
-gap_conv_layer_4c = get_output_layer(model, "conv_4c")
-gap_conv_layer_4d = get_output_layer(model, "conv_4d")
+# gap_conv_layer_4a = get_output_layer(model, "conv_4a")
+# gap_conv_layer_4b = get_output_layer(model, "conv_4b")
+# gap_conv_layer_4c = get_output_layer(model, "conv_4c")
+# gap_conv_layer_4d = get_output_layer(model, "conv_4d")
 
 final_conv_layer = get_output_layer(model, "conv_6_1")
 
@@ -664,12 +659,16 @@ final_conv_layer = get_output_layer(model, "conv_6_1")
 #      gap_conv_layer_4b.output,gap_conv_layer_4c.output,
 #      gap_conv_layer_4d.output, model.layers[-1].output])
 
-get_output = K.function( 
-    [ model.inputs[0], model.inputs[1],K.learning_phase() ] ,
-     [final_conv_layer.output,gap_conv_layer_4a.output,
-     gap_conv_layer_4b.output,gap_conv_layer_4c.output,
-     gap_conv_layer_4d.output, model.layers[-1].output])
+# get_output = K.function( 
+#     [ model.inputs[0], model.inputs[1],K.learning_phase() ] ,
+#      [final_conv_layer.output,gap_conv_layer_4a.output,
+#      gap_conv_layer_4b.output,gap_conv_layer_4c.output,
+#      gap_conv_layer_4d.output, model.layers[-1].output])
 
+
+get_output = K.function( 
+    [ model.inputs[0],K.learning_phase() ] ,
+     [final_conv_layer.output, model.layers[-1].output])
 
 
 class_weights = model.layers[-1].get_weights()[0]
@@ -711,32 +710,40 @@ class_weights = model.layers[-1].get_weights()[0]
 
 
 images_to_show = 25
-X_test_text_used = X_test_text[:images_to_show]
-for comment_idx, index in enumerate(ava_test[:images_to_show].index):
+
+# X_test_text_used = X_test_text[-images_to_show:][::-1]
+
+# class_weights_to_visualize = class_weights[1324:1948]
+# class_weights_to_visualize =  np.column_stack((
+#     class_weights_to_visualize[:,0:5].mean(axis=1),
+#      class_weights_to_visualize[:,5:10].mean(axis=1)))
+
+for comment_idx, index in enumerate(ava_test[-images_to_show:][::-1].index):
     input_path = "../dataset/AVA/data/{}.jpg".format(index)
     original_img = cv2.imread(input_path).astype(np.float32)
+    width, height,_ = original_img.shape
 
     im = process_image(cv2.resize(original_img,(224,224)))
 
-    [conv_outputs, gap_conv_outputs_4a,gap_conv_outputs_4b,
-    gap_conv_outputs_4c,gap_conv_outputs_4d, predictions] = get_output( [im,
-        np.expand_dims(X_test_text_used[comment_idx], axis=0),
-         0])
+    # [conv_outputs, gap_conv_outputs_4a,gap_conv_outputs_4b,
+    # gap_conv_outputs_4c,gap_conv_outputs_4d, predictions] = get_output( [im,
+    #     np.expand_dims(X_test_text_used[comment_idx], axis=0),
+    #      0])
 
-    conv_to_visualize = gap_conv_outputs_4a[0, :, :, :]
-    
+    [conv_outputs, predictions] = get_output( [im,0])
 
-    # class_weights_to_visualize = [ class_weights[:, 0:5].sum(axis=1), class_weights[:, 5:10].sum(axis=1) ]
 
-    class_weights_to_visualize = class_weights[1324:1948,0:10]
+    # conv_to_visualize = gap_conv_outputs_4a[0, :, :, :]
+    conv_to_visualize = conv_outputs[0, :, :, :]
 
     output_image = original_img.copy()
 
-    for class_weight in class_weights_to_visualize.T:
+
+
+    for class_weight_to_visualize in class_weights_to_visualize.T: # class_weights_to_visualize.T:
         cam = np.zeros(dtype = np.float32, shape = conv_to_visualize.shape[1:3])
-        for i, w in enumerate(class_weight):
+        for i, w in enumerate(class_weight_to_visualize):
             cam += w * conv_to_visualize[i, :, :]
-        width, height,_ = original_img.shape
         cam /= np.max(cam)
         cam = cv2.resize(cam, (height, width))
         heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
@@ -744,8 +751,10 @@ for comment_idx, index in enumerate(ava_test[:images_to_show].index):
         img_cam = heatmap*0.5 + original_img
         print("CALLED CONCATENATE")
         output_image = np.concatenate((output_image, img_cam), axis=1)
+    print()
+    print()
 
-    cv2.imwrite("heatmaps/heatmap - {} - 4a.png".format(index), output_image)
+    cv2.imwrite("heatmaps/heatmap - {} - 4a - singlegap.png".format(index), output_image)
 
 
 
