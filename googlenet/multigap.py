@@ -622,7 +622,7 @@ model.fit(X_train,Y_train,
 
 
 from keras.utils.visualize_util import plot
-plot(model, to_file='{}.png'.format(unique_model_identifier),show_shapes=True)
+plot(model, to_file='{}.png'.format('after'),show_shapes=True)
 
 
 
@@ -642,9 +642,6 @@ def get_output_layer(model, layer_name):
     layer_dict = dict([(layer.name, layer) for layer in model.layers])
     layer = layer_dict[layer_name]
     return layer
-
-class_weights = model.layers[-1].get_weights()[0]
-
 
 # gap_conv_layer_4a = get_output_layer(model, "conv_4a")
 # gap_conv_layer_4b = get_output_layer(model, "conv_4b")
@@ -713,7 +710,7 @@ images_to_show = 25
 
 # X_test_text_used = X_test_text[-images_to_show:][::-1]
 
-# class_weights_to_visualize = class_weights[1324:1948]
+class_weights_to_visualize = class_weights#[1324:1948]
 # class_weights_to_visualize =  np.column_stack((
 #     class_weights_to_visualize[:,0:5].mean(axis=1),
 #      class_weights_to_visualize[:,5:10].mean(axis=1)))
@@ -736,14 +733,17 @@ for comment_idx, index in enumerate(ava_test[-images_to_show:][::-1].index):
     # conv_to_visualize = gap_conv_outputs_4a[0, :, :, :]
     conv_to_visualize = conv_outputs[0, :, :, :]
 
+
+
     output_image = original_img.copy()
 
-
-
-    for class_weight_to_visualize in class_weights_to_visualize.T: # class_weights_to_visualize.T:
+    for class_weight_to_visualize in class_weights_to_visualize.T:
         cam = np.zeros(dtype = np.float32, shape = conv_to_visualize.shape[1:3])
+
+        class_to_visualize = 1 # 0 for bad, 1 for good
         for i, w in enumerate(class_weight_to_visualize):
-            cam += w * conv_to_visualize[i, :, :]
+                cam += w * conv_to_visualize[i, :, :]
+
         cam /= np.max(cam)
         cam = cv2.resize(cam, (height, width))
         heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
@@ -751,13 +751,11 @@ for comment_idx, index in enumerate(ava_test[-images_to_show:][::-1].index):
         img_cam = heatmap*0.5 + original_img
         print("CALLED CONCATENATE")
         output_image = np.concatenate((output_image, img_cam), axis=1)
+
+    cv2.imwrite("heatmaps/heatmap - {} - singlegap.png".format(index), output_image)
     print()
     print()
-
-    cv2.imwrite("heatmaps/heatmap - {} - 4a - singlegap.png".format(index), output_image)
-
-
-
+    
 
 # model.evaluate(X_test,Y_test)
 # accuracy = evaluate_distribution_accuracy(model, [X_test,X_test_text], Y_test)

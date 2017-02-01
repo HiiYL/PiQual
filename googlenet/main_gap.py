@@ -303,7 +303,7 @@ model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch", validatio
 
 
 
-model = create_googlenet('weights/googlenet_aesthetics_weights.h5', heatmap=False)
+model = create_googlenet('weights/googlenet_aesthetics_weights.h5', heatmap=True)
 
 ava_path = "../dataset/AVA/data/"
 style = pd.read_table('../dataset/AVA/style_image_lists/train.jpgl', index_col=0)
@@ -319,8 +319,8 @@ vanishing_point = vanishing_point.sort_values(by="score")
 
 
 
-for index in vanishing_point.iloc[::-1][:25].index:
+for index in ava_test[-25:][::-1].index:
     image_name = str(index) + ".jpg"
     input_path = ava_path + image_name
-    output_path = "output-semantic/6/" + image_name
+    output_path = "heatmaps/heatmap-" + image_name
     read_and_generate_heatmap(input_path, output_path)
