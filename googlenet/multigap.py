@@ -628,13 +628,13 @@ plot(model, to_file='{}.png'.format('after'),show_shapes=True)
 
 
 
-# model = create_googlenet('weights/2017-01-25 22_56_09 - distribution_2layergru_extra_conv_layer.h5',
-#  use_distribution=use_distribution, use_semantics=False,use_multigap=True,use_comments=True,
-#   embedding_layer=embedding_layer,extra_conv_layer=True)
+model = create_googlenet('weights/2017-01-25 22_56_09 - distribution_2layergru_extra_conv_layer.h5',
+ use_distribution=True, use_semantics=False,use_multigap=True,use_comments=True,
+  embedding_layer=embedding_layer,extra_conv_layer=True)
 
-model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
- use_distribution=False, use_semantics=False,use_multigap=False,use_comments=False,
-  embedding_layer=None,extra_conv_layer=False,load_weights_by_name=False)
+# model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
+#  use_distribution=False, use_semantics=False,use_multigap=False,use_comments=False,
+#   embedding_layer=None,extra_conv_layer=False,load_weights_by_name=False)
 
 from keras import backend as K
 def get_output_layer(model, layer_name):
@@ -643,10 +643,10 @@ def get_output_layer(model, layer_name):
     layer = layer_dict[layer_name]
     return layer
 
-# gap_conv_layer_4a = get_output_layer(model, "conv_4a")
-# gap_conv_layer_4b = get_output_layer(model, "conv_4b")
-# gap_conv_layer_4c = get_output_layer(model, "conv_4c")
-# gap_conv_layer_4d = get_output_layer(model, "conv_4d")
+gap_conv_layer_4a = get_output_layer(model, "conv_4a")
+gap_conv_layer_4b = get_output_layer(model, "conv_4b")
+gap_conv_layer_4c = get_output_layer(model, "conv_4c")
+gap_conv_layer_4d = get_output_layer(model, "conv_4d")
 
 final_conv_layer = get_output_layer(model, "conv_6_1")
 
@@ -656,16 +656,16 @@ final_conv_layer = get_output_layer(model, "conv_6_1")
 #      gap_conv_layer_4b.output,gap_conv_layer_4c.output,
 #      gap_conv_layer_4d.output, model.layers[-1].output])
 
-# get_output = K.function( 
-#     [ model.inputs[0], model.inputs[1],K.learning_phase() ] ,
-#      [final_conv_layer.output,gap_conv_layer_4a.output,
-#      gap_conv_layer_4b.output,gap_conv_layer_4c.output,
-#      gap_conv_layer_4d.output, model.layers[-1].output])
-
-
 get_output = K.function( 
-    [ model.inputs[0],K.learning_phase() ] ,
-     [final_conv_layer.output, model.layers[-1].output])
+    [ model.inputs[0], model.inputs[1],K.learning_phase() ] ,
+     [final_conv_layer.output,gap_conv_layer_4a.output,
+     gap_conv_layer_4b.output,gap_conv_layer_4c.output,
+     gap_conv_layer_4d.output, model.layers[-1].output])
+
+
+# get_output = K.function( 
+#     [ model.inputs[0],K.learning_phase() ] ,
+#      [final_conv_layer.output, model.layers[-1].output])
 
 
 class_weights = model.layers[-1].get_weights()[0]
@@ -706,32 +706,35 @@ class_weights = model.layers[-1].get_weights()[0]
 #     cv2.imwrite("heatmaps/heatmap - {} - 4a - notext.png".format(index), output_image)
 
 
-images_to_show = 25
+images_to_show = 100
 
-# X_test_text_used = X_test_text[-images_to_show:][::-1]
+X_test_text_used = X_test_text[-images_to_show:][::-1]
 
-class_weights_to_visualize = class_weights#[1324:1948]
-# class_weights_to_visualize =  np.column_stack((
-#     class_weights_to_visualize[:,0:5].mean(axis=1),
-#      class_weights_to_visualize[:,5:10].mean(axis=1)))
+class_weights_to_visualize = class_weights[1324:1948]
+class_weights_to_visualize =  np.column_stack((
+    class_weights_to_visualize[:,0:5].mean(axis=1),
+     class_weights_to_visualize[:,5:10].mean(axis=1)))
 
 for comment_idx, index in enumerate(ava_test[-images_to_show:][::-1].index):
     input_path = "../dataset/AVA/data/{}.jpg".format(index)
     original_img = cv2.imread(input_path).astype(np.float32)
+
+    width, height,_ = original_img.shape
+    original_img = cv2.resize(original_img, (int(height / 2),int(width /2)))
     width, height,_ = original_img.shape
 
     im = process_image(cv2.resize(original_img,(224,224)))
 
-    # [conv_outputs, gap_conv_outputs_4a,gap_conv_outputs_4b,
-    # gap_conv_outputs_4c,gap_conv_outputs_4d, predictions] = get_output( [im,
-    #     np.expand_dims(X_test_text_used[comment_idx], axis=0),
-    #      0])
+    [conv_outputs, gap_conv_outputs_4a,gap_conv_outputs_4b,
+    gap_conv_outputs_4c,gap_conv_outputs_4d, predictions] = get_output( [im,
+        np.expand_dims(X_test_text_used[comment_idx], axis=0),
+         0])
 
-    [conv_outputs, predictions] = get_output( [im,0])
+    # [conv_outputs, predictions] = get_output( [im,0])
 
 
-    # conv_to_visualize = gap_conv_outputs_4a[0, :, :, :]
-    conv_to_visualize = conv_outputs[0, :, :, :]
+    conv_to_visualize = gap_conv_outputs_4a[0, :, :, :]
+    # conv_to_visualize = conv_outputs[0, :, :, :]
 
 
 
@@ -752,7 +755,7 @@ for comment_idx, index in enumerate(ava_test[-images_to_show:][::-1].index):
         print("CALLED CONCATENATE")
         output_image = np.concatenate((output_image, img_cam), axis=1)
 
-    cv2.imwrite("heatmaps/heatmap - {} - singlegap.png".format(index), output_image)
+    cv2.imwrite("heatmaps/{} - comments.png".format(index), output_image)
     print()
     print()
     
@@ -766,7 +769,20 @@ accuracy = evaluate_distribution_accuracy(model, [X_test,X_test_text], Y_test)
 
 
 
+joint_pred = np.load('joint_pred.npy')
+binarised_pred =  np.column_stack((
+    joint_pred[:,0:5].sum(axis=1),
+     joint_pred[:,5:10].sum(axis=1)))
 
+good_confidence = binarised_pred[:,1]
+
+store = HDFStore('../dataset_h5/labels.h5','r')
+
+ava_test = store['labels_test']
+ava_test.loc[:,'joint_pred'] = good_confidence
+
+ava_test.sort_values(by='joint_pred')
+# indices_sorted = sorted(range(len(good_confidence)), key=lambda k: good_confidence[k])
 
 
 
