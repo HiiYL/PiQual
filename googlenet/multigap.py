@@ -249,10 +249,16 @@ def evaluate_distribution_accuracy(model, X_test, Y_test):
         aesthetics_pred = np.array(y_pred)
 
 
+    if(isinstance(Y_test,list)):
+        aesthetics_label = np.array(Y_test[0])
+    else:
+        aesthetics_label = np.array(Y_test)
+
+
     weights = np.array([1,2,3,4,5,6,7,8,9,10])
 
     score_pred = (aesthetics_pred * weights).sum(axis=1)
-    score_test = (Y_test * weights).sum(axis=1)
+    score_test = (aesthetics_label * weights).sum(axis=1)
 
     Y_pred_binary = np.array([ 1 if row >= 5 else 0 for row in score_pred])
     Y_test_binary = np.array([ 1 if row >= 5 else 0 for row in score_test])
@@ -286,8 +292,9 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
         x_text_aesthetics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3,return_sequences=True, name='gru_aesthetics_1')(embedded_sequences)
         x_text_aesthetics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3,name='gru_aesthetics_2')(x_text_aesthetics)
 
-        x_text_semantics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3,return_sequences=True, name='gru_semantics_1')(embedded_sequences)
-        x_text_semantics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3, name='gru_semantics_2')(x_text_semantics)
+        if use_semantics and not rapid_style:
+            x_text_semantics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3,return_sequences=True, name='gru_semantics_1')(embedded_sequences)
+            x_text_semantics = GRU(EMBEDDING_DIM,dropout_W = 0.3,dropout_U = 0.3, name='gru_semantics_2')(x_text_semantics)
 
     
     conv1_7x7_s2 = Convolution2D(64,7,7,subsample=(2,2),border_mode='same',activation='relu',name='conv1/7x7_s2',W_regularizer=l2(0.0002))(input_image)
@@ -505,9 +512,13 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
 
     if use_multigap:
         if use_comments:
-            x_aesthetics = merge([x_aesthetics, x_text_aesthetics, inception_4a_gap, inception_4b_gap, inception_4c_gap, inception_4d_gap] ,mode='concat',concat_axis=1)
+            x_aesthetics = merge([x_aesthetics, x_text_aesthetics, inception_4a_gap, inception_4b_gap, inception_4c_gap, inception_4d_gap],mode='concat',concat_axis=1)
         else:
-            x_aesthetics = merge([x_aesthetics, inception_4a_gap, inception_4b_gap, inception_4c_gap, inception_4d_gap] ,mode='concat',concat_axis=1)
+            x_aesthetics = merge([x_aesthetics, inception_4a_gap, inception_4b_gap, inception_4c_gap, inception_4d_gap],mode='concat',concat_axis=1)
+    else:
+        if use_comments:
+            x_aesthetics = merge([x_aesthetics, x_text_aesthetics],mode='concat',concat_axis=1)
+
 
     if use_distribution:
         if use_multigap:
@@ -546,17 +557,17 @@ def create_googlenet(weights_path=None, use_distribution=False, use_multigap=Fal
 
 
 use_distribution = True
-use_semantics = True
+use_semantics = False
 # X_train, Y_train, X_test, Y_test = prepareData(use_distribution=use_distribution)
-# X_train, Y_train,X_test, Y_test,X_train_text, X_test_text,embedding_layer= prepareData(use_distribution=use_distribution, use_semantics=use_semantics, use_comments=True)
-X_train, Y_train,X_test, Y_test= prepareData(use_distribution=use_distribution, use_semantics=False)
-
+X_train, Y_train,X_test, Y_test,X_train_text, X_test_text,embedding_layer= prepareData(use_distribution=use_distribution, use_semantics=use_semantics, use_comments=True)
+# X_train, Y_train,X_test, Y_test= prepareData(use_distribution=use_distribution, use_semantics=False)
+# X_train, Y_train, Y_train_semantics, X_test, Y_test, Y_test_semantics, X_train_text, X_test_text, embedding_layer = prepareData(use_distribution=use_distribution, use_semantics=use_semantics, use_comments=True)
 
 
 # CURRENT MODEL
-# model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
-#  use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True,use_comments=True,
-#   embedding_layer=embedding_layer,extra_conv_layer=True)
+model = create_googlenet('weights/2017-01-25 22:56:09 - distribution_2layergru_extra_conv_layer.h5',
+ use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=False,use_comments=True,
+  embedding_layer=embedding_layer,extra_conv_layer=False)
 
 # model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
 #  use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True, heatmap=False)
@@ -568,9 +579,9 @@ X_train, Y_train,X_test, Y_test= prepareData(use_distribution=use_distribution, 
 
 
 # RAPID STYLE
-model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
- use_distribution=use_distribution, use_semantics=True,
- use_multigap=False,extra_conv_layer=False, rapid_style=True)
+# model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
+#  use_distribution=use_distribution, use_semantics=True,
+#  use_multigap=False,extra_conv_layer=False, rapid_style=True)
 
 
 # rmsProp = RMSprop(lr=0.0001,clipnorm=1.,clipvalue=0.5)
@@ -586,7 +597,7 @@ else:
 
 time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-model_identifier = "distribution_singlegap_rapidstyle"
+model_identifier = "joint_distribution_gru_singegap"
 unique_model_identifier = "{} - {}".format(time_now, model_identifier)
 
 checkpointer = ModelCheckpoint(filepath="weights/{}.h5".format(unique_model_identifier), verbose=1, save_best_only=True)
@@ -603,11 +614,16 @@ csv_logger = CSVLogger('logs/{}.log'.format(unique_model_identifier))
 #     callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
 
 
-model.fit(X_train,Y_train,
-    nb_epoch=20, batch_size=32, shuffle="batch",
-    validation_data=(X_test, Y_test),
-    callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
+# model.fit(X_train,Y_train,
+#     nb_epoch=20, batch_size=32, shuffle="batch",
+#     validation_data=(X_test, Y_test),
+#     callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
 
+
+model.fit([X_train,X_train_text],Y_train,
+    nb_epoch=20, batch_size=32, shuffle="batch",
+    validation_data=([X_test,X_test_text], Y_test),
+    callbacks=[csv_logger,checkpointer,reduce_lr])#,reduce_lr])#,class_weight = class_weight)
 
 # datagen = ImageDataGenerator(
 #     featurewise_center=True,
@@ -622,7 +638,7 @@ model.fit(X_train,Y_train,
 
 
 from keras.utils.visualize_util import plot
-plot(model, to_file='{}.png'.format('after'),show_shapes=True)
+plot(model, to_file='{}.png'.format(unique_model_identifier),show_shapes=True)
 
 
 
@@ -761,13 +777,7 @@ for comment_idx, index in enumerate(ava_test[-images_to_show:][::-1].index):
     
 
 # model.evaluate(X_test,Y_test)
-# accuracy = evaluate_distribution_accuracy(model, [X_test,X_test_text], Y_test)
-
-
 accuracy = evaluate_distribution_accuracy(model, [X_test,X_test_text], Y_test)
-
-
-
 
 joint_pred = np.load('joint_pred.npy')
 binarised_pred =  np.column_stack((
@@ -785,4 +795,8 @@ ava_test.sort_values(by='joint_pred')
 # indices_sorted = sorted(range(len(good_confidence)), key=lambda k: good_confidence[k])
 
 
+out = model.predict([X_test,X_test_text])
+np.save('joint_pred.npy',out)
 
+out = model.predict(X_test)
+np.save('binary_singlegap.npy',out)
