@@ -12,6 +12,7 @@ Installation
 6. conda install -c https://conda.binstar.org/menpo opencv3
 
 Usage
+1. Navigate to googlenet/ directory and use code from within main.py to run 
 
 TODO: Write usage instructions
 
