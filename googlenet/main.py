@@ -566,8 +566,8 @@ X_train, Y_train,X_test, Y_test,X_train_text, X_test_text,embedding_layer= prepa
 
 # CURRENT MODEL
 model = create_googlenet('weights/2017-01-25 22:56:09 - distribution_2layergru_extra_conv_layer.h5',
- use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=False,use_comments=True,
-  embedding_layer=embedding_layer,extra_conv_layer=False)
+ use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True,use_comments=True,
+  embedding_layer=embedding_layer,extra_conv_layer=True)
 
 # model = create_googlenet('weights/googlenet_aesthetics_weights.h5',
 #  use_distribution=use_distribution, use_semantics=use_semantics,use_multigap=True, heatmap=False)
@@ -722,58 +722,75 @@ class_weights = model.layers[-1].get_weights()[0]
 #     cv2.imwrite("heatmaps/heatmap - {} - 4a - notext.png".format(index), output_image)
 
 
-images_to_show = 100
+images_to_show = 50
 
-X_test_text_used = X_test_text[-images_to_show:][::-1]
+total_amount = X_test_text.shape[0]
+
+middle = int(total_amount/2)
+min_boundary = middle - int(images_to_show/2)
+max_boundary = middle + int(images_to_show/2)
+
+# X_test_text_used = X_test_text[min_boundary:max_boundary]#[::-1]
+
 
 class_weights_to_visualize = class_weights[1324:1948]
 class_weights_to_visualize =  np.column_stack((
     class_weights_to_visualize[:,0:5].mean(axis=1),
      class_weights_to_visualize[:,5:10].mean(axis=1)))
 
+
+X_test_text_used = X_test_text[-images_to_show:][::-1]
 for comment_idx, index in enumerate(ava_test[-images_to_show:][::-1].index):
-    input_path = "../dataset/AVA/data/{}.jpg".format(index)
-    original_img = cv2.imread(input_path).astype(np.float32)
 
-    width, height,_ = original_img.shape
-    original_img = cv2.resize(original_img, (int(height / 2),int(width /2)))
-    width, height,_ = original_img.shape
+    output_filename = "heatmaps/{} - comments.png".format(index)
 
-    im = process_image(cv2.resize(original_img,(224,224)))
+    if os.path.isfile(output_filename):
+        print("[INFO] file with id of {} already exists, skipping".format(index))
+    else:
+        input_path = "../dataset/AVA/data/{}.jpg".format(index)
+        original_img = cv2.imread(input_path).astype(np.float32)
 
-    [conv_outputs, gap_conv_outputs_4a,gap_conv_outputs_4b,
-    gap_conv_outputs_4c,gap_conv_outputs_4d, predictions] = get_output( [im,
-        np.expand_dims(X_test_text_used[comment_idx], axis=0),
-         0])
+        width, height,_ = original_img.shape
+        original_img = cv2.resize(original_img, (int(height / 2),int(width /2)))
+        width, height,_ = original_img.shape
 
-    # [conv_outputs, predictions] = get_output( [im,0])
+        im = process_image(cv2.resize(original_img,(224,224)))
+
+        [conv_outputs, gap_conv_outputs_4a,gap_conv_outputs_4b,
+        gap_conv_outputs_4c,gap_conv_outputs_4d, predictions] = get_output( [im,
+            np.expand_dims(X_test_text_used[comment_idx], axis=0),
+             0])
+
+        # [conv_outputs, predictions] = get_output( [im,0])
 
 
-    conv_to_visualize = gap_conv_outputs_4a[0, :, :, :]
-    # conv_to_visualize = conv_outputs[0, :, :, :]
+        conv_to_visualize = gap_conv_outputs_4a[0, :, :, :]
+        # conv_to_visualize = conv_outputs[0, :, :, :]
 
 
 
-    output_image = original_img.copy()
+        output_image = original_img.copy()
 
-    for class_weight_to_visualize in class_weights_to_visualize.T:
-        cam = np.zeros(dtype = np.float32, shape = conv_to_visualize.shape[1:3])
+        for class_weight_to_visualize in class_weights_to_visualize.T:
+            cam = np.zeros(dtype = np.float32, shape = conv_to_visualize.shape[1:3])
 
-        class_to_visualize = 1 # 0 for bad, 1 for good
-        for i, w in enumerate(class_weight_to_visualize):
-                cam += w * conv_to_visualize[i, :, :]
+            class_to_visualize = 1 # 0 for bad, 1 for good
+            for i, w in enumerate(class_weight_to_visualize):
+                    cam += w * conv_to_visualize[i, :, :]
 
-        cam /= np.max(cam)
-        cam = cv2.resize(cam, (height, width))
-        heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
-        heatmap[np.where(cam < 0.2)] = 0
-        img_cam = heatmap*0.5 + original_img
-        print("CALLED CONCATENATE")
-        output_image = np.concatenate((output_image, img_cam), axis=1)
+            cam /= np.max(cam)
+            cam = cv2.resize(cam, (height, width))
+            heatmap = cv2.applyColorMap(np.uint8(255*cam), cv2.COLORMAP_JET)
+            heatmap[np.where(cam < 0.2)] = 0
+            img_cam = heatmap*0.5 + original_img
+            print("CALLED CONCATENATE")
+            output_image = np.concatenate((output_image, img_cam), axis=1)
 
-    cv2.imwrite("heatmaps/{} - comments.png".format(index), output_image)
-    print()
-    print()
+        # output_image = cv2.resize(output_image, (int(output_image.shape[1] / 2), int(output_image.shape[0]/2)))
+
+        cv2.imwrite(output_filename, output_image)
+        print()
+        print()
     
 
 # model.evaluate(X_test,Y_test)
