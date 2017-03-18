@@ -2,14 +2,15 @@
 
 Large Scale Image Aesthetics Evaluation 
 
+Thesis available for download [here](https://drive.google.com/file/d/0B0wpQxTjT1jOUWlPbmNSNDV3QmM/view?usp=sharing).
+
+Paper submission to ICIP 2017 available [here](https://drive.google.com/open?id=0B0wpQxTjT1jOVml5OXpCd3Q3cTQ).
+
 ### Installation
 
 1. Install anaconda
 2. Install keras
 3. run
-4. sudo chown -R hii /home/hii/anaconda3
-5. sudo chmod -R +x /home/hii/anaconda3
-6. conda install -c https://conda.binstar.org/menpo opencv3
 
 ### Usage
 1. Navigate to googlenet/ directory and use code from within main.py to run 
