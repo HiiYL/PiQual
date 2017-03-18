@@ -18,11 +18,11 @@ import h5py
 class ImageToHDF5:
 
   def __init__(self,delta=1.0,resize=True):
-    self.store = HDFStore('dataset_h5/labels.h5')
+    self.store = HDFStore('dataset/labels.h5')
     self.ava_table = self.store['labels_train']
     self.ava_path = "dataset/AVA/data/"
     self.ava_data_path = os.path.join(os.getcwd(), self.ava_path)
-    self.h5f = h5py.File('dataset_h5/images_299x299_delta_{}.h5'.format(delta),'w')
+    self.h5f = h5py.File('dataset/images_299x299_delta_{}.h5'.format(delta),'w')
     self.delta = delta
 
   def prepare_train(self, limit=None, dim=(224,224)):
@@ -146,7 +146,7 @@ def retrieval():
   import h5py                                                             
   from fuel.datasets import H5PYDataset
 
-  train_set  = H5PYDataset('dataset_h5/images_no_resize_delta_0.0.h5',which_sets=['train'], sources=('data_train',)) 
+  train_set  = H5PYDataset('dataset/images_no_resize_delta_0.0.h5',which_sets=['train'], sources=('data_train',)) 
   print(train_set.axis_labels['data_train'])
   handle = train_set.open()
   data_no_resize,  = train_set.get_data(handle, slice(0,3))
@@ -158,16 +158,16 @@ def retrieval():
 
 
   delta = 0.0
-  store = HDFStore('dataset_h5/labels.h5','r')
+  store = HDFStore('dataset/labels.h5','r')
   # delta = 1
   ava_table = store['labels_train'][:3]
 
   ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
   # X_train = np.hstack(X).reshape(10000,224,224,3)
   # X = pickle.load( open("images_224.p", "rb"))
-  h5f = h5py.File('dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
+  h5f = h5py.File('dataset/images_224_delta_{0}.h5'.format(delta),'r')
 
-  h5f2 = h5py.File('dataset_h5/images_no_resize_delta_0.0.h5'.format(delta),'r')
+  h5f2 = h5py.File('dataset/images_no_resize_delta_0.0.h5'.format(delta),'r')
   X_train = h5f['data_train']
   #X_train = np.hstack(X).reshape(3,224,224,16160).T
 

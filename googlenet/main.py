@@ -182,7 +182,7 @@ def getDistribution(dataframe):
 
 
 def prepareData(delta=0.0, use_distribution=False, use_semantics=False, use_comments=False):
-    store = HDFStore('../dataset_h5/labels.h5','r')
+    store = HDFStore('../dataset/labels.h5','r')
     ava_table = store['labels_train']
     ava_test = store['labels_test']
 
@@ -190,7 +190,7 @@ def prepareData(delta=0.0, use_distribution=False, use_semantics=False, use_comm
         ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
 
 
-    h5f = h5py.File('../dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
+    h5f = h5py.File('../dataset/images_224_delta_{0}.h5'.format(delta),'r')
     X_train = h5f['data_train']
     X_test = h5f['data_test']
 
@@ -803,7 +803,7 @@ binarised_pred =  np.column_stack((
 
 good_confidence = binarised_pred[:,1]
 
-store = HDFStore('../dataset_h5/labels.h5','r')
+store = HDFStore('../dataset/labels.h5','r')
 
 ava_test = store['labels_test']
 ava_test.loc[:,'joint_pred'] = good_confidence

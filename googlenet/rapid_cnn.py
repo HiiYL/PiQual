@@ -444,14 +444,14 @@ def getDistribution(dataframe):
 model = create_googlenet('googlenet_aesthetics_weights.h5', heatmap=False)
 
 delta = 0.0
-store = HDFStore('../dataset_h5/labels.h5','r')
+store = HDFStore('../dataset/labels.h5','r')
 # delta = 1
 ava_table = store['labels_train']
 
 ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
 # X_train = np.hstack(X).reshape(10000,224,224,3)
 # X = pickle.load( open("images_224.p", "rb"))
-h5f = h5py.File('../dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
+h5f = h5py.File('../dataset/images_224_delta_{0}.h5'.format(delta),'r')
 X_train = h5f['data_train']
 #X_train = np.hstack(X).reshape(3,224,224,16160).T
 
@@ -489,7 +489,7 @@ model.fit(X_train,Y_train,nb_epoch=20, batch_size=32, shuffle="batch", validatio
 
 
 model = create_googlenet('weights/2016-12-07 16:54:38 googlenet_aesthetics_weights_rapid_distribution.h5')
-h5f_selfie = h5py.File('../dataset_h5/selfie_images_224x224.h5','r')
+h5f_selfie = h5py.File('../dataset/selfie_images_224x224.h5','r')
 
 out = model.predict(h5f_selfie['data'])
 

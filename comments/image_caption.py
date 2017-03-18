@@ -41,11 +41,11 @@ def tokenizeAndGenerateIndex(texts):
     return data
 
 
-h5f = h5py.File('../dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
+h5f = h5py.File('../dataset/images_224_delta_{0}.h5'.format(delta),'r')
 X_train = h5f['data_train']
 
 
-store = HDFStore('../dataset_h5/labels.h5')
+store = HDFStore('../dataset/labels.h5')
 ava_table = store['labels_train']
 
 comments_train = ava_table.ix[:,'comments'].as_matrix()

@@ -10,7 +10,7 @@ import numpy as np
 def copyTestSet(dest_dir="test_images/"):
   ava_path = "../dataset/AVA/data/"
   ava_data_path = os.path.join(os.getcwd(), ava_path)
-  store = HDFStore('../dataset_h5/labels.h5')
+  store = HDFStore('../dataset/labels.h5')
   test_labels = store['labels_test']
   imagesCount = test_labels.shape[0]
 
@@ -25,7 +25,7 @@ def copyTestSet(dest_dir="test_images/"):
 
 
 def computeAspectRatio():
-  store = HDFStore('dataset_h5/labels.h5')
+  store = HDFStore('dataset/labels.h5')
   ava_table = store['labels_train']
 
 
@@ -79,13 +79,13 @@ def stable_hdf5():
 
   delta = 0.0
 
-  store = HDFStore('dataset_h5/labels.h5')
+  store = HDFStore('dataset/labels.h5')
   ava_table = store['labels_train']
 
   filtered_ava_table = ava_table.ix[(ava_table['aspect_ratio'] == 6)]
   ava_path = "dataset/AVA/data/"
   ava_data_path = os.path.join(os.getcwd(), ava_path)
-  h5f = h5py.File('dataset_h5/images_ar_6_delta_{}.h5'.format(delta),'w')
+  h5f = h5py.File('dataset/images_ar_6_delta_{}.h5'.format(delta),'w')
 
   # filtered_ava_table = ava_table.ix[ (ava_table['aspect_ratio'] == 6) | (ava_table['aspect_ratio'] == 7) ]
 

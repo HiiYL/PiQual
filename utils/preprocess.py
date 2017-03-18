@@ -59,7 +59,7 @@ ava_table['good'] = ava_table.apply(good, axis=1)
 
 
 ## Save modified AVA dataset to HDFStore
-store = HDFStore('dataset_h5/labels.h5')
+store = HDFStore('dataset/labels.h5')
 store['labels'] = ava_table
 
 
@@ -75,7 +75,7 @@ store['labels_test'] = standard_test_set
 store.close()
 
 
-store = HDFStore('dataset_h5/labels.h5')
+store = HDFStore('dataset/labels.h5')
 ava_table = store['labels_train']
 ## Preprocess Comments
 ava_comment_path = "dataset/AVA-Comments/"

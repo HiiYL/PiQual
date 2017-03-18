@@ -310,14 +310,14 @@ def read_and_generate_heatmap(input_path, output_path):
 model = create_googlenet('weights/googlenet_weights.h5', heatmap=False)
 
 delta = 0.0
-store = HDFStore('../dataset_h5/labels.h5','r')
+store = HDFStore('../dataset/labels.h5','r')
 # delta = 1
 ava_table = store['labels_train']
 
 ava_table = ava_table[( abs(ava_table.score - 5) >= delta)]
 # X_train = np.hstack(X).reshape(10000,224,224,3)
 # X = pickle.load( open("images_224.p", "rb"))
-h5f = h5py.File('../dataset_h5/images_224_delta_{0}.h5'.format(delta),'r')
+h5f = h5py.File('../dataset/images_224_delta_{0}.h5'.format(delta),'r')
 X_train = h5f['data_train']
 #X_train = np.hstack(X).reshape(3,224,224,16160).T
 

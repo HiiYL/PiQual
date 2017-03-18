@@ -14,7 +14,7 @@ from pandas import HDFStore, DataFrame
 import pickle
 
 class ImageFisherVector(object):
-    dataset_dir = '../dataset_h5/'
+    dataset_dir = '../dataset/'
     skipped_indices = []
     filename = 'images_224_delta_1.5.h5'
     test_filename = 'images_224.h5'
@@ -27,7 +27,7 @@ class ImageFisherVector(object):
 
     gmm = ""
     def __init__(self):
-        store = HDFStore('../dataset_h5/labels.h5')
+        store = HDFStore('../dataset/labels.h5')
         if(os.path.isfile(classifier_filename) and os.path.isfile(gmm_filename)):
             classifier =  pickle.load( open( "classifier.p", "rb" ) )
             print("Loaded Classifier!")

@@ -1,7 +1,7 @@
 from pandas import HDFStore
 
 
-store = HDFStore('dataset_h5/labels.h5')
+store = HDFStore('dataset/labels.h5')
 ava_table = store['labels_train']
 
 path = [ '/home/hii/Projects/PiQual/dataset/AVA/data/' + str(value) + '.jpg' for value in ava_table.index ]
