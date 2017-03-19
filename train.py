@@ -1,39 +1,8 @@
-from googlenet_custom_layers import PoolHelper,LRN
-from keras.models import model_from_json
-
-from scipy import ndimage, misc
-import cv2
-import numpy as np
-import os
-import pickle
-import pandas as pd
-from pandas import HDFStore, DataFrame
-
-import h5py
-import matplotlib.pyplot as plt
-
 import sys
 sys.setrecursionlimit(10000)
 
-from scipy.misc import imread, imresize
-
-from keras.layers import Convolution2D, MaxPooling2D, AveragePooling2D, ZeroPadding2D
-from keras.layers import  Flatten, merge, Reshape, Activation
-from keras.layers import Input, LSTM, Dense, Activation, GRU,Convolution1D,Dropout
-from keras.layers.pooling import GlobalAveragePooling2D, GlobalMaxPooling2D,GlobalMaxPooling1D
-from keras.models import Model
-from keras.regularizers import l2
-from keras.optimizers import SGD, RMSprop,Adam
-from keras.utils.np_utils import to_categorical
 from keras.callbacks import CSVLogger, ReduceLROnPlateau, ModelCheckpoint
-
-from keras.preprocessing.text import Tokenizer
-from keras.preprocessing.sequence import pad_sequences
-
-from keras.preprocessing.image import ImageDataGenerator
-
-
-from googlenet_custom_layers import PoolHelper,LRN
+from keras.optimizers import Adam
 
 from datetime import datetime
 
