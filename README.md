@@ -8,6 +8,8 @@ Paper submission to ICIP 2017 available [here](https://drive.google.com/open?id=
 
 Pretrained weights can be downloaded [here](https://drive.google.com/open?id=0B0wpQxTjT1jOcmZaOHJFNXlnM1E) 
 
+File for labels & comments available [here](https://drive.google.com/open?id=0B0wpQxTjT1jOZVg1SnV0WjhfSXc)
+
 
 ## Network Architecture
 [<img src="https://cloud.githubusercontent.com/assets/7908951/24071467/5928adb0-0c0d-11e7-9b42-701875871eba.png" width=427 height=427>](wow)
