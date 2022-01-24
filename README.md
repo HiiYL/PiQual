@@ -2,7 +2,7 @@
 
 Large Scale Image Aesthetics Evaluation 
 
-Thesis available for download [here](https://drive.google.com/file/d/0B0wpQxTjT1jOUWlPbmNSNDV3QmM/view?usp=sharing).
+Thesis available for download [here](https://drive.google.com/file/d/0B0wpQxTjT1jOUWlPbmNSNDV3QmM/view?usp=sharing&resourcekey=0-rtEdOvRiEzR1F3BQtRy86g).
 
 Paper submission to ICIP 2017 available [here](https://drive.google.com/open?id=0B0wpQxTjT1jOVml5OXpCd3Q3cTQ).
 
