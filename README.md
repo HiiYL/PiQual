@@ -4,9 +4,9 @@ Large Scale Image Aesthetics Evaluation
 
 Thesis available for download [here](https://drive.google.com/file/d/0B0wpQxTjT1jOUWlPbmNSNDV3QmM/view?usp=sharing&resourcekey=0-rtEdOvRiEzR1F3BQtRy86g).
 
-Paper submission to ICIP 2017 available [here](https://drive.google.com/open?id=0B0wpQxTjT1jOVml5OXpCd3Q3cTQ).
+Paper submission to ICIP 2017 available [here](https://drive.google.com/file/d/0B0wpQxTjT1jOVml5OXpCd3Q3cTQ/view?usp=sharing&resourcekey=0-mstUOihdgf0ruZ9q5e5IEw).
 
-Pretrained weights can be downloaded [here](https://drive.google.com/open?id=0B0wpQxTjT1jOcmZaOHJFNXlnM1E) 
+Pretrained weights can be downloaded [here](https://drive.google.com/file/d/0B0wpQxTjT1jObklvQktjT05DZ3c/view?usp=sharing&resourcekey=0-gQ39VdBtyIE0Fujv2Tds3g) 
 
 File for labels & comments available [here](https://drive.google.com/open?id=0B0wpQxTjT1jOZVg1SnV0WjhfSXc)
 
